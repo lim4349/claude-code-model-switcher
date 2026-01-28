@@ -2,7 +2,7 @@
 # Claude Code Model Switcher
 # Convenient CLI for switching between Claude Code models
 
-set -euo pipefail
+set -eo pipefail
 
 # ============================================
 # Configuration
