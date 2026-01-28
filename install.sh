@@ -129,13 +129,16 @@ install_main_script() {
 create_wrapper_scripts() {
     log_info "Creating wrapper scripts..."
 
-    local aliases=("claude" "claude-glm" "claude-kimi" "claude-opus" "claude-sonnet" "claude-haiku")
+    # Note: We skip 'claude' wrapper to avoid conflicts with the real claude binary
+    local aliases=("claude-opus" "claude-sonnet" "claude-haiku" "claude-glm" "claude-kimi")
 
     for alias in "${aliases[@]}"; do
         create_wrapper_script "$alias"
     done
 
     log_success "Created ${#aliases[@]} wrapper scripts"
+    log_info "Note: 'claude' wrapper not created to avoid conflicts with real claude binary"
+    log_info "Use 'claude-sonnet' for default Sonnet, or 'claude-model use <alias>'"
 }
 
 create_wrapper_script() {
@@ -259,21 +262,20 @@ show_post_install() {
     echo -e "${color_bold}${color_green}═══════════════════════════════════════════════════${color_reset}"
     echo ""
     echo -e "${color_bold}Available Commands:${color_reset}"
-    echo -e "  ${color_blue}claude${color_reset}          # Run Claude Code with Opus 4.5"
+    echo -e "  ${color_blue}claude-sonnet${color_reset}   # Run Claude Code with Sonnet 4.5 (default)"
+    echo -e "  ${color_blue}claude-opus${color_reset}     # Run Claude Code with Opus 4.5"
+    echo -e "  ${color_blue}claude-haiku${color_reset}    # Run Claude Code with Haiku 4.5"
     echo -e "  ${color_blue}claude-glm${color_reset}      # Run Claude Code with GLM 4.7"
     echo -e "  ${color_blue}claude-kimi${color_reset}     # Run Claude Code with Kimi 2.5"
-    echo -e "  ${color_blue}claude-opus${color_reset}     # Run Claude Code with Opus 4.5"
-    echo -e "  ${color_blue}claude-sonnet${color_reset}   # Run Claude Code with Sonnet 4.5"
-    echo -e "  ${color_blue}claude-haiku${color_reset}    # Run Claude Code with Haiku 4.5"
     echo -e "  ${color_blue}claude-model${color_reset}    # Manage model settings"
     echo ""
     echo -e "${color_bold}Examples:${color_reset}"
-    echo -e "  claude                    # Start with default (Opus)"
-    echo -e "  claude-glm                # Start with GLM 4.7"
-    echo -e "  claude-kimi               # Start with Kimi K2 (requires setup)"
-    echo -e "  claude-model current      # Show current model"
-    echo -e "  claude-model list         # List all models"
-    echo -e "  claude-model use claude-sonnet  # Use Sonnet"
+    echo -e "  claude-sonnet            # Start with Sonnet (default)"
+    echo -e "  claude-glm               # Start with GLM 4.7"
+    echo -e "  claude-opus              # Start with Opus"
+    echo -e "  claude-model current     # Show current model"
+    echo -e "  claude-model list        # List all models"
+    echo -e "  claude-model use claude-sonnet   # Use Sonnet"
     echo ""
     echo -e "${color_bold}Kimi Setup (for claude-kimi):${color_reset}"
     echo -e "  ${color_yellow}export ANTHROPIC_AUTH_TOKEN=sk-YOURKEY${color_reset}"

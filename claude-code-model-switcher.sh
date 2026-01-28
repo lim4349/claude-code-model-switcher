@@ -54,7 +54,7 @@ log_error() {
 get_model_for_alias() {
     local alias="${1:-}"
     case "$alias" in
-        claude)          echo "claude-opus-4-5-20251101" ;;
+        claude)          echo "claude-sonnet-4-5-20250515" ;;
         claude-opus)     echo "claude-opus-4-5-20251101" ;;
         claude-sonnet)   echo "claude-sonnet-4-5-20250515" ;;
         claude-haiku)    echo "claude-haiku-4-5-20250114" ;;
@@ -225,19 +225,18 @@ EOF
 ${color_bold}EXAMPLES${color_reset}
     $SCRIPT_NAME current              # Show current model
     $SCRIPT_NAME list                 # List all presets
-    $SCRIPT_NAME use claude           # Run with default (Opus)
+    $SCRIPT_NAME use claude           # Run with default (Sonnet)
     $SCRIPT_NAME use claude-glm       # Run with GLM 4.7
     $SCRIPT_NAME use claude-sonnet    # Run with Sonnet
     $SCRIPT_NAME use glm-4.7          # Run with custom model
 
 ${color_bold}QUICK ALIASES${color_reset}
     You can also use direct commands:
-    ${color_blue}claude${color_reset}          # Same as: $SCRIPT_NAME use claude
+    ${color_blue}claude-sonnet${color_reset}   # Same as: $SCRIPT_NAME use claude-sonnet
+    ${color_blue}claude-opus${color_reset}     # Same as: $SCRIPT_NAME use claude-opus
+    ${color_blue}claude-haiku${color_reset}    # Same as: $SCRIPT_NAME use claude-haiku
     ${color_blue}claude-glm${color_reset}      # Same as: $SCRIPT_NAME use claude-glm
     ${color_blue}claude-kimi${color_reset}     # Same as: $SCRIPT_NAME use claude-kimi
-    ${color_blue}claude-opus${color_reset}     # Same as: $SCRIPT_NAME use claude-opus
-    ${color_blue}claude-sonnet${color_reset}   # Same as: $SCRIPT_NAME use claude-sonnet
-    ${color_blue}claude-haiku${color_reset}    # Same as: $SCRIPT_NAME use claude-haiku
 
 ${color_bold}KIMI SETUP${color_reset}
     To use claude-kimi, set up environment variables:
