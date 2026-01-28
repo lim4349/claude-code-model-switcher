@@ -134,20 +134,18 @@ list_models() {
 
 # Find the real claude binary (not wrappers)
 _find_claude_binary() {
-    # Try npm global bin directory first
+    # Try npm global prefix first (works in all npm versions)
     if command -v npm &>/dev/null; then
-        local npm_bin
-        npm_bin=$(npm bin -g 2>/dev/null || echo "")
-        if [[ -n "$npm_bin" && -f "$npm_bin/claude" ]]; then
-            echo "$npm_bin/claude"
+        local npm_prefix
+        npm_prefix=$(npm prefix -g 2>/dev/null || echo "")
+        if [[ -n "$npm_prefix" && -f "$npm_prefix/bin/claude" ]]; then
+            echo "$npm_prefix/bin/claude"
             return 0
         fi
     fi
 
-    # Check common npm global locations
+    # Check common locations
     local locations=(
-        "$npm_config_prefix/bin/claude"
-        "$NPM_CONFIG_PREFIX/bin/claude"
         "/usr/local/bin/claude"
         "/usr/bin/claude"
         "$HOME/.npm-global/bin/claude"
@@ -156,24 +154,19 @@ _find_claude_binary() {
 
     for location in "${locations[@]}"; do
         if [[ -f "$location" ]]; then
-            # Verify it's the real npm-installed claude (contains "node_modules")
-            if grep -q "node_modules" "$location" 2>/dev/null; then
-                echo "$location"
-                return 0
+            # Check if it's our wrapper (text file, starts with #!)
+            if head -1 "$location" 2>/dev/null | grep -q "#!"; then
+                # It's a script, check if it's our wrapper
+                if grep -q "claude-model" "$location" 2>/dev/null; then
+                    # Skip our wrapper
+                    continue
+                fi
             fi
-        fi
-    done
-
-    # Fallback: use command -v but skip our own wrappers
-    local claude_path
-    claude_path=$(command -v claude 2>/dev/null || echo "")
-    if [[ -n "$claude_path" && -f "$claude_path" ]]; then
-        # Check if it's our wrapper (contains "claude-model")
-        if ! grep -q "claude-model" "$claude_path" 2>/dev/null; then
-            echo "$claude_path"
+            # It's a binary or non-wrapper script
+            echo "$location"
             return 0
         fi
-    fi
+    done
 
     return 1
 }
