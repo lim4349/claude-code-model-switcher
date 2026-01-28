@@ -106,13 +106,13 @@ get_model_for_alias() {
 }
 
 list_models() {
-    local current
+    local current model is_current
     current=$(get_current_model)
 
     echo -e "\n${color_bold}Available Model Presets:${color_reset}\n"
     for alias in "${!MODEL_PRESETS[@]}"; do
         model="${MODEL_PRESETS[$alias]}"
-        local is_current=""
+        is_current=""
         if [[ "$model" == "$current" ]]; then
             is_current="${color_green} [CURRENT]${color_reset}"
         fi
