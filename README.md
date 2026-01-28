@@ -4,7 +4,7 @@ Convenient CLI commands to switch between different Claude Code models with ease
 
 ## Features
 
-- **Simple Commands**: `claude`, `claude-glm`, `claude-opus`, `claude-sonnet`, etc.
+- **Simple Commands**: `claude`, `claude-glm`, `claude-kimi`, `claude-opus`, `claude-sonnet`, etc.
 - **Auto Configuration**: Automatically configures the default model for each command
 - **Shell Completion**: Bash and Zsh completion support
 - **Easy Installation**: One-line installer script
@@ -31,6 +31,9 @@ claude
 # GLM 4.7
 claude-glm
 
+# Kimi 2.5 (requires setup)
+claude-kimi
+
 # Sonnet 4.5
 claude-sonnet
 
@@ -47,10 +50,22 @@ claude-model claude-opus-4-5-20250114
 |---------|--------------|
 | `claude` | `claude-opus-4-5-20251101` |
 | `claude-glm` | `glm-4.7` |
+| `claude-kimi` | `kimi-k2.5` |
 | `claude-opus` | `claude-opus-4-5-20251101` |
 | `claude-sonnet` | `claude-sonnet-4-5-20250515` |
 | `claude-haiku` | `claude-haiku-4-5-20250114` |
 | `claude-model <model>` | Custom model |
+
+## Kimi 2.5 Setup
+
+To use `claude-kimi`, you need to set up Moonshot AI API:
+
+```bash
+export ANTHROPIC_AUTH_TOKEN=sk-YOURKEY
+export ANTHROPIC_BASE_URL=https://api.moonshot.ai/anthropic
+```
+
+Get your API key at: https://platform.moonshot.ai/
 
 ## Development
 

@@ -129,7 +129,7 @@ install_main_script() {
 create_wrapper_scripts() {
     log_info "Creating wrapper scripts..."
 
-    local aliases=("claude" "claude-glm" "claude-opus" "claude-sonnet" "claude-haiku")
+    local aliases=("claude" "claude-glm" "claude-kimi" "claude-opus" "claude-sonnet" "claude-haiku")
 
     for alias in "${aliases[@]}"; do
         create_wrapper_script "$alias"
@@ -167,7 +167,7 @@ _claude_model_completion() {
     _init_completion || return
 
     local commands="current list set use help"
-    local aliases="claude claude-glm claude-opus claude-sonnet claude-haiku"
+    local aliases="claude claude-glm claude-kimi claude-opus claude-sonnet claude-haiku"
 
     case "${prev}" in
         claude-model|use|set)
@@ -184,6 +184,7 @@ _claude_model_completion() {
 complete -F _claude_model_completion claude-model
 complete -F _claude_model_completion claude
 complete -F _claude_model_completion claude-glm
+complete -F _claude_model_completion claude-kimi
 complete -F _claude_model_completion claude-opus
 complete -F _claude_model_completion claude-sonnet
 complete -F _claude_model_completion claude-haiku
@@ -191,7 +192,7 @@ EOF
 
     # Zsh completion
     cat > "$COMPLETION_DIR/claude-model.zsh" << 'EOF'
-#compdef claude-model claude claude-glm claude-opus claude-sonnet claude-haiku
+#compdef claude-model claude claude-glm claude-kimi claude-opus claude-sonnet claude-haiku
 
 _claude_model() {
     local -a commands aliases
@@ -205,6 +206,7 @@ _claude_model() {
     aliases=(
         'claude:Default (Opus 4.5)'
         'claude-glm:GLM 4.7'
+        'claude-kimi:Kimi 2.5'
         'claude-opus:Opus 4.5'
         'claude-sonnet:Sonnet 4.5'
         'claude-haiku:Haiku 4.5'
@@ -259,6 +261,7 @@ show_post_install() {
     echo -e "${color_bold}Available Commands:${color_reset}"
     echo -e "  ${color_blue}claude${color_reset}          # Run Claude Code with Opus 4.5"
     echo -e "  ${color_blue}claude-glm${color_reset}      # Run Claude Code with GLM 4.7"
+    echo -e "  ${color_blue}claude-kimi${color_reset}     # Run Claude Code with Kimi 2.5"
     echo -e "  ${color_blue}claude-opus${color_reset}     # Run Claude Code with Opus 4.5"
     echo -e "  ${color_blue}claude-sonnet${color_reset}   # Run Claude Code with Sonnet 4.5"
     echo -e "  ${color_blue}claude-haiku${color_reset}    # Run Claude Code with Haiku 4.5"
@@ -267,9 +270,15 @@ show_post_install() {
     echo -e "${color_bold}Examples:${color_reset}"
     echo -e "  claude                    # Start with default (Opus)"
     echo -e "  claude-glm                # Start with GLM 4.7"
+    echo -e "  claude-kimi               # Start with Kimi K2 (requires setup)"
     echo -e "  claude-model current      # Show current model"
     echo -e "  claude-model list         # List all models"
     echo -e "  claude-model use claude-sonnet  # Use Sonnet"
+    echo ""
+    echo -e "${color_bold}Kimi Setup (for claude-kimi):${color_reset}"
+    echo -e "  ${color_yellow}export ANTHROPIC_AUTH_TOKEN=sk-YOURKEY${color_reset}"
+    echo -e "  ${color_yellow}export ANTHROPIC_BASE_URL=https://api.moonshot.ai/anthropic${color_reset}"
+    echo -e "  Get your key at: https://platform.moonshot.ai/"
     echo ""
     echo -e "${color_yellow}⚠ Note:${color_reset} Restart your shell or run 'source ~/.bashrc' (or ~/.zshrc) to apply changes."
     echo ""

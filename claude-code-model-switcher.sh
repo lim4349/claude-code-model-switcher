@@ -18,6 +18,7 @@ declare -A MODEL_PRESETS=(
     ["claude-sonnet"]="claude-sonnet-4-5-20250515"
     ["claude-haiku"]="claude-haiku-4-5-20250114"
     ["claude-glm"]="glm-4.7"
+    ["claude-kimi"]="kimi-k2.5"
 )
 
 # Claude Code config directory
@@ -105,15 +106,24 @@ get_model_for_alias() {
 }
 
 list_models() {
+    local current
+    current=$(get_current_model)
+
     echo -e "\n${color_bold}Available Model Presets:${color_reset}\n"
     for alias in "${!MODEL_PRESETS[@]}"; do
         model="${MODEL_PRESETS[$alias]}"
+        local is_current=""
+        if [[ "$model" == "$current" ]]; then
+            is_current="${color_green} [CURRENT]${color_reset}"
+        fi
         if [[ "$alias" == "claude" ]]; then
-            echo -e "  ${color_green}${alias}${color_reset} → $model (default)"
+            echo -e "  ${color_green}${alias}${color_reset} → $model${is_current}"
         else
-            echo -e "  ${color_blue}${alias}${color_reset} → $model"
+            echo -e "  ${color_blue}${alias}${color_reset} → $model${is_current}"
         fi
     done
+    echo ""
+    echo -e "Current default model: ${color_bold}${current}${color_reset}"
     echo ""
 }
 
@@ -223,9 +233,16 @@ ${color_bold}QUICK ALIASES${color_reset}
     You can also use direct commands:
     ${color_blue}claude${color_reset}          # Same as: $SCRIPT_NAME use claude
     ${color_blue}claude-glm${color_reset}      # Same as: $SCRIPT_NAME use claude-glm
+    ${color_blue}claude-kimi${color_reset}     # Same as: $SCRIPT_NAME use claude-kimi
     ${color_blue}claude-opus${color_reset}     # Same as: $SCRIPT_NAME use claude-opus
     ${color_blue}claude-sonnet${color_reset}   # Same as: $SCRIPT_NAME use claude-sonnet
     ${color_blue}claude-haiku${color_reset}    # Same as: $SCRIPT_NAME use claude-haiku
+
+${color_bold}KIMI SETUP${color_reset}
+    To use claude-kimi, set up environment variables:
+    ${color_yellow}export ANTHROPIC_AUTH_TOKEN=sk-YOURKEY${color_reset}
+    ${color_yellow}export ANTHROPIC_BASE_URL=https://api.moonshot.ai/anthropic${color_reset}
+    Get your key at: https://platform.moonshot.ai/
 
 EOF
 }
