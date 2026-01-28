@@ -132,6 +132,52 @@ list_models() {
 # Claude Code Execution
 # ============================================
 
+# Find the real claude binary (not wrappers)
+_find_claude_binary() {
+    # Try npm global bin directory first
+    if command -v npm &>/dev/null; then
+        local npm_bin
+        npm_bin=$(npm bin -g 2>/dev/null || echo "")
+        if [[ -n "$npm_bin" && -f "$npm_bin/claude" ]]; then
+            echo "$npm_bin/claude"
+            return 0
+        fi
+    fi
+
+    # Check common npm global locations
+    local locations=(
+        "$npm_config_prefix/bin/claude"
+        "$NPM_CONFIG_PREFIX/bin/claude"
+        "/usr/local/bin/claude"
+        "/usr/bin/claude"
+        "$HOME/.npm-global/bin/claude"
+        "$HOME/.local/bin/claude"
+    )
+
+    for location in "${locations[@]}"; do
+        if [[ -f "$location" ]]; then
+            # Verify it's the real npm-installed claude (contains "node_modules")
+            if grep -q "node_modules" "$location" 2>/dev/null; then
+                echo "$location"
+                return 0
+            fi
+        fi
+    done
+
+    # Fallback: use command -v but skip our own wrappers
+    local claude_path
+    claude_path=$(command -v claude 2>/dev/null || echo "")
+    if [[ -n "$claude_path" && -f "$claude_path" ]]; then
+        # Check if it's our wrapper (contains "claude-model")
+        if ! grep -q "claude-model" "$claude_path" 2>/dev/null; then
+            echo "$claude_path"
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
 run_claude_code() {
     local model="${1:-}"
     shift || true
@@ -142,12 +188,11 @@ run_claude_code() {
     # Run Claude Code with remaining arguments
     log_info "Starting Claude Code with model: ${color_bold}$model${color_reset}"
 
-    if command -v claude &>/dev/null; then
-        exec claude "$@"
-    elif [[ -f "/usr/local/bin/claude" ]]; then
-        exec /usr/local/bin/claude "$@"
-    elif [[ -f "$HOME/.local/bin/claude" ]]; then
-        exec "$HOME/.local/bin/claude" "$@"
+    local claude_bin
+    claude_bin=$(_find_claude_binary)
+
+    if [[ -n "$claude_bin" && -f "$claude_bin" ]]; then
+        exec "$claude_bin" "$@"
     else
         log_error "Claude Code not found. Please install it first:"
         echo "  npm install -g @anthropic-ai/claude-code"
