@@ -67,6 +67,22 @@ export ANTHROPIC_BASE_URL=https://api.moonshot.ai/anthropic
 
 Get your API key at: https://platform.moonshot.ai/
 
+## Uninstall
+
+To completely remove Claude Code Model Switcher and restore default settings:
+
+```bash
+cd claude-code-model-switcher
+./uninstall.sh
+```
+
+This will:
+- Remove all wrapper scripts (`claude`, `claude-glm`, `claude-kimi`, etc.)
+- Remove shell completions
+- Clean up PATH exports from shell configs
+- Restore Claude Code settings to default (remove `defaultModel`)
+- Create backups of modified files
+
 ## Development
 
 ```bash

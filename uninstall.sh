@@ -9,7 +9,9 @@ set -euo pipefail
 
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 COMPLETION_DIR="$HOME/.claude-code-model-switcher"
-SCRIPTS=("claude-model" "claude" "claude-glm" "claude-opus" "claude-sonnet" "claude-haiku")
+CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+CLAUDE_SETTINGS_FILE="$CLAUDE_CONFIG_DIR/settings.json"
+SCRIPTS=("claude-model" "claude" "claude-glm" "claude-kimi" "claude-opus" "claude-sonnet" "claude-haiku")
 
 # ============================================
 # Colors
@@ -93,10 +95,54 @@ remove_completions() {
     done
 }
 
+restore_claude_settings() {
+    log_info "Restoring Claude Code settings to default..."
+
+    if [[ ! -f "$CLAUDE_SETTINGS_FILE" ]]; then
+        log_warn "Claude settings file not found: $CLAUDE_SETTINGS_FILE"
+        return
+    fi
+
+    # Create backup
+    cp "$CLAUDE_SETTINGS_FILE" "$CLAUDE_SETTINGS_FILE.bak"
+    log_success "Backup created: $CLAUDE_SETTINGS_FILE.bak"
+
+    if command -v jq &>/dev/null; then
+        # Remove defaultModel using jq
+        tmp_file=$(mktemp)
+        jq 'del(.defaultModel)' "$CLAUDE_SETTINGS_FILE" > "$tmp_file"
+        mv "$tmp_file" "$CLAUDE_SETTINGS_FILE"
+        log_success "Removed defaultModel from settings.json"
+    else
+        # Fallback: remove defaultModel line using sed
+        sed -i.bak '/"defaultModel"[[:space:]]*:[[:space:]]*"[^"]*"/d' "$CLAUDE_SETTINGS_FILE"
+        # Clean up trailing comma
+        sed -i 's/,([[:space:]]*)$/\1/' "$CLAUDE_SETTINGS_FILE"
+        log_success "Removed defaultModel from settings.json"
+    fi
+}
+
 remove_path_exports() {
-    log_warn "PATH exports in shell configs were NOT removed."
-    log_info "If you want to remove them manually, check your ~/.bashrc and ~/.zshrc for:"
-    echo "  export PATH=\"\$HOME/.local/bin:\$PATH\""
+    log_info "Checking PATH exports in shell configs..."
+
+    local configs=("$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.config/fish/config.fish")
+    local found=false
+
+    for config in "${configs[@]}"; do
+        if [[ -f "$config" ]] && grep -q "Claude Code Model Switcher" "$config"; then
+            log_info "Removing PATH export from $config"
+            # Create backup
+            cp "$config" "$config.bak"
+            # Remove the block
+            sed -i '/# Claude Code Model Switcher/,+1d' "$config"
+            log_success "Removed PATH export from $config (backup: $config.bak)"
+            found=true
+        fi
+    done
+
+    if [[ "$found" == false ]]; then
+        log_warn "No PATH exports found in shell configs"
+    fi
 }
 
 show_post_uninstall() {
@@ -105,7 +151,17 @@ show_post_uninstall() {
     echo -e "${color_bold}${color_green}  Uninstallation Complete!${color_reset}"
     echo -e "${color_bold}${color_green}═══════════════════════════════════════════════════${color_reset}"
     echo ""
-    echo -e "${color_yellow}⚠ Note:${color_reset} Restart your shell to apply all changes."
+    echo -e "${color_bold}What was restored:${color_reset}"
+    echo -e "  ${color_green}✓${color_reset} Claude Code defaultModel setting removed (back to default)"
+    echo -e "  ${color_green}✓${color_reset} All wrapper scripts removed"
+    echo -e "  ${color_green}✓${color_reset} Shell completions removed"
+    echo -e "  ${color_green}✓${color_reset} PATH exports cleaned up"
+    echo ""
+    echo -e "${color_yellow}⚠ Note:${color_reset} Restart your shell or run 'source ~/.bashrc' (or ~/.zshrc) to apply all changes."
+    echo ""
+    echo -e "${color_bold}Backups created:${color_reset}"
+    echo -e "  ${color_blue}~${color_reset} Claude settings: $CLAUDE_SETTINGS_FILE.bak"
+    echo -e "  ${color_blue}~${color_reset} Shell configs: *.bak files"
     echo ""
 }
 
@@ -121,6 +177,8 @@ confirm_uninstall() {
     echo -e "  ${color_blue}•${color_reset} Scripts in $INSTALL_DIR"
     echo -e "  ${color_blue}•${color_reset} Completions in $COMPLETION_DIR"
     echo -e "  ${color_blue}•${color_reset} Completion references from shell configs"
+    echo -e "  ${color_blue}•${color_reset} PATH exports from shell configs"
+    echo -e "  ${color_blue}•${color_reset} defaultModel from Claude settings (restored to default)"
     echo ""
     read -p "Continue? (y/N) " -n 1 -r
     echo
@@ -144,6 +202,7 @@ main() {
     remove_scripts
     remove_completions
     remove_path_exports
+    restore_claude_settings
     show_post_uninstall
 }
 
