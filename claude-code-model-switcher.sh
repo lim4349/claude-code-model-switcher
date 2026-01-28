@@ -73,7 +73,7 @@ get_current_model() {
 }
 
 set_model() {
-    local model="$1"
+    local model="${1:-}"
 
     # Create config directory if it doesn't exist
     mkdir -p "$CLAUDE_CONFIG_DIR"
@@ -101,19 +101,19 @@ set_model() {
 }
 
 get_model_for_alias() {
-    local alias="$1"
+    local alias="${1:-}"
     echo "${MODEL_PRESETS[$alias]:-}"
 }
 
 list_models() {
-    local current model is_current
+    local current model is_current alias
     current=$(get_current_model)
 
     echo -e "\n${color_bold}Available Model Presets:${color_reset}\n"
     for alias in "${!MODEL_PRESETS[@]}"; do
         model="${MODEL_PRESETS[$alias]}"
         is_current=""
-        if [[ "$model" == "$current" ]]; then
+        if [[ "${model:-}" == "${current:-}" ]]; then
             is_current="${color_green} [CURRENT]${color_reset}"
         fi
         if [[ "$alias" == "claude" ]]; then
@@ -123,7 +123,7 @@ list_models() {
         fi
     done
     echo ""
-    echo -e "Current default model: ${color_bold}${current}${color_reset}"
+    echo -e "Current default model: ${color_bold}${current:-default}${color_reset}"
     echo ""
 }
 
@@ -132,8 +132,8 @@ list_models() {
 # ============================================
 
 run_claude_code() {
-    local model="$1"
-    shift
+    local model="${1:-}"
+    shift || true
 
     # Set the model before running
     set_model "$model"
@@ -161,7 +161,7 @@ run_claude_code() {
 cmd_current() {
     local current
     current=$(get_current_model)
-    echo "Current default model: ${color_bold}${current}${color_reset}"
+    echo "Current default model: ${color_bold}${current:-default}${color_reset}"
 }
 
 cmd_list() {
@@ -169,9 +169,9 @@ cmd_list() {
 }
 
 cmd_set() {
-    local model="$1"
+    local model="${1:-}"
 
-    if [[ -z "$model" ]]; then
+    if [[ -z "${model:-}" ]]; then
         log_error "Model name required"
         echo "Usage: $SCRIPT_NAME set <model-name>"
         exit 1
@@ -181,20 +181,20 @@ cmd_set() {
 }
 
 cmd_use() {
-    local alias_or_model="$1"
-    shift
+    local alias_or_model="${1:-}"
+    local model
+    shift || true
 
-    if [[ -z "$alias_or_model" ]]; then
+    if [[ -z "${alias_or_model:-}" ]]; then
         log_error "Model alias or name required"
         echo "Usage: $SCRIPT_NAME use <model-alias|model-name>"
         exit 1
     fi
 
     # Check if it's a preset alias
-    local model
     model=$(get_model_for_alias "$alias_or_model")
 
-    if [[ -z "$model" ]]; then
+    if [[ -z "${model:-}" ]]; then
         # Use as-is (custom model)
         model="$alias_or_model"
     fi
@@ -273,7 +273,7 @@ main() {
             ;;
         "")
             # No command = run with default model
-            run_claude_code "${MODEL_PRESETS[claude]}"
+            run_claude_code "${MODEL_PRESETS[claude]:-}"
             ;;
         *)
             # Treat as model alias/name
