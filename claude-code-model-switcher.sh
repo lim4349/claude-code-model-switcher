@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Claude Code Model Switcher
 # Convenient CLI for switching between Claude Code models
+# Compatible with bash 3.2+ (macOS default)
 
 set -eo pipefail
 
@@ -10,16 +11,6 @@ set -eo pipefail
 
 VERSION="1.0.0"
 SCRIPT_NAME="$(basename "$0")"
-
-# Model presets
-declare -A MODEL_PRESETS=(
-    ["claude"]="claude-opus-4-5-20251101"
-    ["claude-opus"]="claude-opus-4-5-20251101"
-    ["claude-sonnet"]="claude-sonnet-4-5-20250515"
-    ["claude-haiku"]="claude-haiku-4-5-20250114"
-    ["claude-glm"]="glm-4.7"
-    ["claude-kimi"]="kimi-k2.5"
-)
 
 # Claude Code config directory
 CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
@@ -59,6 +50,19 @@ log_error() {
 # ============================================
 # Model Management
 # ============================================
+
+get_model_for_alias() {
+    local alias="${1:-}"
+    case "$alias" in
+        claude)          echo "claude-opus-4-5-20251101" ;;
+        claude-opus)     echo "claude-opus-4-5-20251101" ;;
+        claude-sonnet)   echo "claude-sonnet-4-5-20250515" ;;
+        claude-haiku)    echo "claude-haiku-4-5-20250114" ;;
+        claude-glm)      echo "glm-4.7" ;;
+        claude-kimi)     echo "kimi-k2.5" ;;
+        *)               echo "" ;;
+    esac
+}
 
 get_current_model() {
     if [[ -f "$CLAUDE_SETTINGS_FILE" ]]; then
@@ -100,19 +104,16 @@ set_model() {
     log_success "Default model set to: ${color_bold}$model${color_reset}"
 }
 
-get_model_for_alias() {
-    local alias="${1:-}"
-    echo "${MODEL_PRESETS[$alias]:-}"
-}
-
 list_models() {
-    local current model is_current alias
+    local current model alias
     current=$(get_current_model)
 
     echo -e "\n${color_bold}Available Model Presets:${color_reset}\n"
-    for alias in "${!MODEL_PRESETS[@]}"; do
-        model="${MODEL_PRESETS[$alias]}"
-        is_current=""
+
+    # List all models
+    for alias in claude claude-opus claude-sonnet claude-haiku claude-glm claude-kimi; do
+        model=$(get_model_for_alias "$alias")
+        local is_current=""
         if [[ "${model:-}" == "${current:-}" ]]; then
             is_current="${color_green} [CURRENT]${color_reset}"
         fi
@@ -273,7 +274,7 @@ main() {
             ;;
         "")
             # No command = run with default model
-            run_claude_code "${MODEL_PRESETS[claude]:-}"
+            run_claude_code "$(get_model_for_alias claude)"
             ;;
         *)
             # Treat as model alias/name
