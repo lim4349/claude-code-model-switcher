@@ -142,6 +142,8 @@ test_list_command() {
 
     assert_contains "$output" "claude" "List should show claude alias"
     assert_contains "$output" "claude-glm" "List should show claude-glm alias"
+    assert_contains "$output" "claude-kimi" "List should show claude-kimi alias"
+    assert_contains "$output" "claude-deepseek" "List should show claude-deepseek alias"
     assert_contains "$output" "claude-opus" "List should show claude-opus alias"
 }
 
@@ -181,7 +183,7 @@ test_settings_file_creation() {
 test_model_presets() {
     log_info "Testing: Model presets..."
 
-    local expected_presets=("claude" "claude-opus" "claude-sonnet" "claude-haiku" "claude-glm")
+    local expected_presets=("claude" "claude-opus" "claude-sonnet" "claude-haiku" "claude-glm" "claude-kimi" "claude-deepseek" "claude-qwen" "claude-minimax" "claude-openrouter")
 
     for preset in "${expected_presets[@]}"; do
         local output

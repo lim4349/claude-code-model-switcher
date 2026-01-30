@@ -8,9 +8,9 @@ set -euo pipefail
 # ============================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
+INSTALL_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+LOCAL_BIN_DIR="${LOCAL_BIN_DIR:-$HOME/.local/bin}"
 SOURCE_SCRIPT="$SCRIPT_DIR/claude-code-model-switcher.sh"
-COMPLETION_DIR="$HOME/.claude-code-model-switcher"
 
 # ============================================
 # Colors
@@ -52,19 +52,15 @@ check_prerequisites() {
 
     # Check if Claude Code is installed
     if ! command -v claude &>/dev/null && [[ ! -f "/usr/local/bin/claude" ]] && [[ ! -f "$HOME/.local/bin/claude" ]]; then
-        log_warn "Claude Code not found in PATH"
+        log_error "Claude Code not found"
         echo ""
-        log_info "Install Claude Code with:"
+        echo "Install Claude Code with:"
         echo "  npm install -g @anthropic-ai/claude-code"
         echo ""
-        read -p "Continue anyway? (y/N) " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            exit 1
-        fi
+        exit 1
     fi
 
-    log_success "Prerequisites check complete"
+    log_success "Claude Code found"
 }
 
 create_install_dir() {
@@ -73,216 +69,136 @@ create_install_dir() {
         mkdir -p "$INSTALL_DIR"
     fi
 
-    # Add to PATH if not already there
-    if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
-        log_warn "$INSTALL_DIR is not in your PATH"
-        detect_and_update_shell_config
-    fi
-}
-
-detect_and_update_shell_config() {
-    local shell_config=""
-    local export_line="export PATH=\"\$HOME/.local/bin:\$PATH\""
-
-    # Detect shell and config file
+    # Detect shell config file
     if [[ -n "${ZSH_VERSION:-}" ]]; then
-        shell_config="$HOME/.zshrc"
+        SHELL_RC="$HOME/.zshrc"
+        SHELL_NAME="zsh"
     elif [[ -n "${FISH_VERSION:-}" ]]; then
-        shell_config="$HOME/.config/fish/config.fish"
-        export_line="set -gx PATH \$HOME/.local/bin \$PATH"
+        SHELL_RC="$HOME/.config/fish/config.fish"
+        SHELL_NAME="fish"
     else
         # Default to bash
-        shell_config="$HOME/.bashrc"
+        SHELL_RC="$HOME/.bashrc"
+        SHELL_NAME="bash"
     fi
-
-    # Check if export already exists
-    if [[ -f "$shell_config" ]] && grep -q "$INSTALL_DIR" "$shell_config"; then
-        log_success "PATH already configured in $shell_config"
-        return
-    fi
-
-    log_info "Adding $INSTALL_DIR to PATH in $shell_config"
-
-    # Create config file if it doesn't exist
-    if [[ ! -f "$shell_config" ]]; then
-        touch "$shell_config"
-    fi
-
-    # Add export line
-    echo "" >> "$shell_config"
-    echo "# Claude Code Model Switcher" >> "$shell_config"
-    echo "$export_line" >> "$shell_config"
-
-    log_success "Added to $shell_config"
-    log_warn "Run 'source $shell_config' or restart your shell to use the new PATH"
 }
 
 install_main_script() {
     log_info "Installing main script..."
 
-    cp "$SOURCE_SCRIPT" "$INSTALL_DIR/claude-model"
-    chmod +x "$INSTALL_DIR/claude-model"
+    # Copy to install directory
+    if [[ -f "$SOURCE_SCRIPT" ]]; then
+        cp "$SOURCE_SCRIPT" "$INSTALL_DIR/claude-model"
+        chmod +x "$INSTALL_DIR/claude-model"
+        log_success "Installed 'claude-model' to: $INSTALL_DIR/claude-model"
 
-    log_success "Installed 'claude-model' command"
+        # Also copy to ~/.local/bin for PATH access
+        if [[ -d "$LOCAL_BIN_DIR" ]] || mkdir -p "$LOCAL_BIN_DIR" 2>/dev/null; then
+            cp "$SOURCE_SCRIPT" "$LOCAL_BIN_DIR/claude-model"
+            chmod +x "$LOCAL_BIN_DIR/claude-model"
+            log_success "Installed 'claude-model' to: $LOCAL_BIN_DIR/claude-model"
+        fi
+    else
+        log_warn "Main script not found at: $SOURCE_SCRIPT"
+    fi
 }
 
-create_wrapper_scripts() {
-    log_info "Creating wrapper scripts..."
+install_wrapper_scripts() {
+    log_info "Installing wrapper scripts..."
 
-    # Note: We skip 'claude' wrapper to avoid conflicts with the real claude binary
-    local aliases=("claude-opus" "claude-sonnet" "claude-haiku" "claude-glm" "claude-kimi")
+    # Copy wrapper scripts to ~/.claude/
+    local wrappers=("claude.sh" "claude-glm.sh" "claude-kimi.sh" "claude-deepseek.sh" "claude-qwen.sh" "claude-minimax.sh" "claude-openrouter.sh")
 
-    for alias in "${aliases[@]}"; do
-        create_wrapper_script "$alias"
+    for wrapper in "${wrappers[@]}"; do
+        if [[ -f "$SCRIPT_DIR/.claude/$wrapper" ]]; then
+            cp "$SCRIPT_DIR/.claude/$wrapper" "$INSTALL_DIR/"
+            chmod +x "$INSTALL_DIR/$wrapper"
+            log_success "Installed: $wrapper"
+        else
+            log_warn "Wrapper not found: $wrapper"
+        fi
     done
-
-    log_success "Created ${#aliases[@]} wrapper scripts"
-    log_info "Note: 'claude' wrapper not created to avoid conflicts with real claude binary"
-    log_info "Use 'claude-sonnet' for default Sonnet, or 'claude-model use <alias>'"
 }
 
-create_wrapper_script() {
-    local alias="$1"
-    local target="$INSTALL_DIR/$alias"
+add_shell_aliases() {
+    log_info "Adding aliases..."
 
-    cat > "$target" << EOF
-#!/usr/bin/env bash
-# Wrapper for: $alias
-# This file is auto-generated by claude-code-model-switcher installer
-
-exec "$INSTALL_DIR/claude-model" use "$alias" "\$@"
-EOF
-
-    chmod +x "$target"
-}
-
-install_completions() {
-    log_info "Installing shell completions..."
-
-    mkdir -p "$COMPLETION_DIR"
-
-    # Bash completion
-    cat > "$COMPLETION_DIR/claude-model.bash" << 'EOF'
-# Claude Code Model Switcher Bash Completion
-
-_claude_model_completion() {
-    local cur prev words cword
-    _init_completion || return
-
-    local commands="current list set use help"
-    local aliases="claude claude-glm claude-kimi claude-opus claude-sonnet claude-haiku"
-
-    case "${prev}" in
-        claude-model|use|set)
-            COMPREPLY=($(compgen -W "$aliases" -- "$cur"))
-            ;;
-        *)
-            if [[ ${cword} -eq 1 ]]; then
-                COMPREPLY=($(compgen -W "$commands" -- "$cur"))
-            fi
-            ;;
-    esac
-}
-
-complete -F _claude_model_completion claude-model
-complete -F _claude_model_completion claude
-complete -F _claude_model_completion claude-glm
-complete -F _claude_model_completion claude-kimi
-complete -F _claude_model_completion claude-opus
-complete -F _claude_model_completion claude-sonnet
-complete -F _claude_model_completion claude-haiku
-EOF
-
-    # Zsh completion
-    cat > "$COMPLETION_DIR/claude-model.zsh" << 'EOF'
-#compdef claude-model claude claude-glm claude-kimi claude-opus claude-sonnet claude-haiku
-
-_claude_model() {
-    local -a commands aliases
-    commands=(
-        'current:Show current default model'
-        'list:List all available model presets'
-        'set:Set default model (without running)'
-        'use:Run Claude Code with specified model'
-        'help:Show help message'
-    )
-    aliases=(
-        'claude:Default (Opus 4.5)'
-        'claude-glm:GLM 4.7'
-        'claude-kimi:Kimi 2.5'
-        'claude-opus:Opus 4.5'
-        'claude-sonnet:Sonnet 4.5'
-        'claude-haiku:Haiku 4.5'
-    )
-
-    if (( CURRENT == 2 )); then
-        _describe 'command' commands
-    elif (( CURRENT == 3 )); then
-        case ${words[2]} in
-            use|set)
-                _describe 'model alias' aliases
-                ;;
-        esac
-    fi
-}
-
-_claude_model "$@"
-EOF
-
-    # Source bash completion in .bashrc if not already there
+    # Add to .bashrc
     local bashrc="$HOME/.bashrc"
-    local completion_line="source \"$COMPLETION_DIR/claude-model.bash\""
+    if [[ -f "$bashrc" ]]; then
+        sed -i.bak '/# Claude Code Model Switcher/d' "$bashrc" 2>/dev/null || true
+        sed -i.bak '/alias claude=/d' "$bashrc" 2>/dev/null || true
+        sed -i.bak '/alias claude-glm=/d' "$bashrc" 2>/dev/null || true
+        sed -i.bak '/alias claude-kimi=/d' "$bashrc" 2>/dev/null || true
+        sed -i.bak '/alias claude-deepseek=/d' "$bashrc" 2>/dev/null || true
+        sed -i.bak '/alias claude-qwen=/d' "$bashrc" 2>/dev/null || true
+        sed -i.bak '/alias claude-minimax=/d' "$bashrc" 2>/dev/null || true
+        sed -i.bak '/alias claude-openrouter=/d' "$bashrc" 2>/dev/null || true
 
-    if [[ -f "$bashrc" ]] && ! grep -q "claude-model.bash" "$bashrc"; then
-        echo "" >> "$bashrc"
-        echo "# Claude Code Model Switcher completion" >> "$bashrc"
-        echo "$completion_line" >> "$bashrc"
-        log_success "Added bash completion to $bashrc"
+        cat >> "$bashrc" << 'EOF'
+
+# Claude Code Model Switcher
+alias claude='~/.claude/claude.sh'              # Claude (Sonnet 4.5)
+alias claude-glm='~/.claude/claude-glm.sh'      # GLM 4.7
+alias claude-kimi='~/.claude/claude-kimi.sh'    # Kimi K2
+alias claude-deepseek='~/.claude/claude-deepseek.sh'    # DeepSeek
+alias claude-qwen='~/.claude/claude-qwen.sh'            # Qwen Plus
+alias claude-minimax='~/.claude/claude-minimax.sh'     # MiniMax M2
+alias claude-openrouter='~/.claude/claude-openrouter.sh' # OpenRouter
+EOF
+        log_success "Aliases added to: $bashrc"
     fi
 
-    # Source zsh completion in .zshrc if not already there
+    # Add to .zshrc
     local zshrc="$HOME/.zshrc"
-    local zsh_completion_line="fpath=('$COMPLETION_DIR' \$fpath)"
+    if [[ -f "$zshrc" ]]; then
+        sed -i.bak '/# Claude Code Model Switcher/d' "$zshrc" 2>/dev/null || true
+        sed -i.bak '/alias claude=/d' "$zshrc" 2>/dev/null || true
+        sed -i.bak '/alias claude-glm=/d' "$zshrc" 2>/dev/null || true
+        sed -i.bak '/alias claude-kimi=/d' "$zshrc" 2>/dev/null || true
+        sed -i.bak '/alias claude-deepseek=/d' "$zshrc" 2>/dev/null || true
+        sed -i.bak '/alias claude-qwen=/d' "$zshrc" 2>/dev/null || true
+        sed -i.bak '/alias claude-minimax=/d' "$zshrc" 2>/dev/null || true
+        sed -i.bak '/alias claude-openrouter=/d' "$zshrc" 2>/dev/null || true
 
-    if [[ -f "$zshrc" ]] && ! grep -q "claude-model.zsh" "$zshrc"; then
-        echo "" >> "$zshrc"
-        echo "# Claude Code Model Switcher completion" >> "$zshrc"
-        echo "$zsh_completion_line" >> "$zshrc"
-        echo "autoload -U compinit && compinit" >> "$zshrc"
-        log_success "Added zsh completion to $zshrc"
+        cat >> "$zshrc" << 'EOF'
+
+# Claude Code Model Switcher
+alias claude='~/.claude/claude.sh'              # Claude (Sonnet 4.5)
+alias claude-glm='~/.claude/claude-glm.sh'      # GLM 4.7
+alias claude-kimi='~/.claude/claude-kimi.sh'    # Kimi K2
+alias claude-deepseek='~/.claude/claude-deepseek.sh'    # DeepSeek
+alias claude-qwen='~/.claude/claude-qwen.sh'            # Qwen Plus
+alias claude-minimax='~/.claude/claude-minimax.sh'     # MiniMax M2
+alias claude-openrouter='~/.claude/claude-openrouter.sh' # OpenRouter
+EOF
+        log_success "Aliases added to: $zshrc"
     fi
-
-    log_success "Completions installed to $COMPLETION_DIR"
 }
 
 show_post_install() {
     echo ""
-    echo -e "${color_bold}${color_green}═══════════════════════════════════════════════════${color_reset}"
+    echo -e "${color_bold}${color_green}═════════════════════════════════════════════════${color_reset}"
     echo -e "${color_bold}${color_green}  Installation Complete!${color_reset}"
-    echo -e "${color_bold}${color_green}═══════════════════════════════════════════════════${color_reset}"
+    echo -e "${color_bold}${color_green}═════════════════════════════════════════════════${color_reset}"
+    echo ""
+    echo -e "${color_yellow}⚠ Next Step:${color_reset}"
+    echo "  1. Reload your shell:"
+    echo -e "     ${color_blue}source $SHELL_RC${color_reset}"
+    echo ""
+    echo "  2. Setup API keys:"
+    echo -e "     ${color_blue}claude-model setup${color_reset}"
+    echo "     or"
+    echo -e "     ${color_blue}claude-model config${color_reset}  # Interactive menu"
     echo ""
     echo -e "${color_bold}Available Commands:${color_reset}"
-    echo -e "  ${color_blue}claude-sonnet${color_reset}   # Run Claude Code with Sonnet 4.5 (default)"
-    echo -e "  ${color_blue}claude-opus${color_reset}     # Run Claude Code with Opus 4.5"
-    echo -e "  ${color_blue}claude-haiku${color_reset}    # Run Claude Code with Haiku 4.5"
-    echo -e "  ${color_blue}claude-glm${color_reset}      # Run Claude Code with GLM 4.7"
-    echo -e "  ${color_blue}claude-kimi${color_reset}     # Run Claude Code with Kimi 2.5"
-    echo -e "  ${color_blue}claude-model${color_reset}    # Manage model settings"
-    echo ""
-    echo -e "${color_bold}Examples:${color_reset}"
-    echo -e "  claude-sonnet            # Start with Sonnet (default)"
-    echo -e "  claude-glm               # Start with GLM 4.7"
-    echo -e "  claude-opus              # Start with Opus"
-    echo -e "  claude-model current     # Show current model"
-    echo -e "  claude-model list        # List all models"
-    echo -e "  claude-model use claude-sonnet   # Use Sonnet"
-    echo ""
-    echo -e "${color_bold}Kimi Setup (for claude-kimi):${color_reset}"
-    echo -e "  ${color_yellow}export ANTHROPIC_AUTH_TOKEN=sk-YOURKEY${color_reset}"
-    echo -e "  ${color_yellow}export ANTHROPIC_BASE_URL=https://api.moonshot.ai/anthropic${color_reset}"
-    echo -e "  Get your key at: https://platform.moonshot.ai/"
-    echo ""
-    echo -e "${color_yellow}⚠ Note:${color_reset} Restart your shell or run 'source ~/.bashrc' (or ~/.zshrc) to apply changes."
+    echo -e "  ${color_blue}claude${color_reset}           # Claude (Sonnet 4.5)"
+    echo -e "  ${color_blue}claude-glm${color_reset}       # GLM 4.7"
+    echo -e "  ${color_blue}claude-kimi${color_reset}      # Kimi K2"
+    echo -e "  ${color_blue}claude-deepseek${color_reset}  # DeepSeek"
+    echo -e "  ${color_blue}claude-qwen${color_reset}      # Qwen Plus"
+    echo -e "  ${color_blue}claude-minimax${color_reset}   # MiniMax M2"
+    echo -e "  ${color_blue}claude-openrouter${color_reset} # OpenRouter"
     echo ""
 }
 
@@ -298,8 +214,8 @@ main() {
     check_prerequisites
     create_install_dir
     install_main_script
-    create_wrapper_scripts
-    install_completions
+    install_wrapper_scripts
+    add_shell_aliases
     show_post_install
 }
 
