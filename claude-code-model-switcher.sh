@@ -48,6 +48,181 @@ log_error() {
 }
 
 # ============================================
+# Provider Settings (gist-compatible)
+# ============================================
+
+_settings_file_for_provider() {
+    local provider="${1:-}"
+    case "$provider" in
+        glm)  echo "$CLAUDE_CONFIG_DIR/zai_settings.json" ;;
+        kimi) echo "$CLAUDE_CONFIG_DIR/kimi_settings.json" ;;
+        *)    echo "" ;;
+    esac
+}
+
+_base_url_for_provider() {
+    local provider="${1:-}"
+    case "$provider" in
+        glm)  echo "https://api.z.ai/api/anthropic" ;;
+        # Kimi Claude-Code compatible endpoint (per user requirement)
+        kimi) echo "https://api.kimi.com/coding/" ;;
+        *)    echo "" ;;
+    esac
+}
+
+_model_for_provider() {
+    local provider="${1:-}"
+    case "$provider" in
+        glm)  echo "glm-4.7" ;;
+        kimi) echo "kimi-k2.5" ;;
+        *)    echo "" ;;
+    esac
+}
+
+_read_existing_token_from_settings() {
+    local settings_file="${1:-}"
+    [[ -f "$settings_file" ]] || return 0
+
+    if command -v jq >/dev/null 2>&1; then
+        jq -r '.env.ANTHROPIC_API_KEY // .env.ANTHROPIC_AUTH_TOKEN // empty' "$settings_file" 2>/dev/null || true
+        return 0
+    fi
+
+    # Fallback without jq: simple string extraction
+    local v=""
+    v="$(grep -o '\"ANTHROPIC_API_KEY\"[[:space:]]*:[[:space:]]*\"[^\"]*\"' "$settings_file" 2>/dev/null \
+        | sed 's/.*"ANTHROPIC_API_KEY"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' \
+        | head -n 1)"
+    if [[ -n "${v:-}" ]]; then
+        echo "$v"
+        return 0
+    fi
+    grep -o '\"ANTHROPIC_AUTH_TOKEN\"[[:space:]]*:[[:space:]]*\"[^\"]*\"' "$settings_file" 2>/dev/null \
+        | sed 's/.*"ANTHROPIC_AUTH_TOKEN"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' \
+        | head -n 1
+}
+
+_read_existing_value_from_settings() {
+    local settings_file="${1:-}"
+    local key="${2:-}" # e.g. ANTHROPIC_BASE_URL / ANTHROPIC_MODEL
+    [[ -f "$settings_file" ]] || return 0
+
+    if command -v jq >/dev/null 2>&1; then
+        jq -r --arg k "$key" '.env[$k] // empty' "$settings_file" 2>/dev/null || true
+        return 0
+    fi
+
+    grep -o "\"$key\"[[:space:]]*:[[:space:]]*\"[^\"]*\"" "$settings_file" 2>/dev/null \
+        | sed "s/.*\"$key\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/" \
+        | head -n 1
+}
+
+_write_provider_settings() {
+    local provider="${1:-}"
+    local token="${2:-}"
+    local base_url_override="${3:-}"
+    local model_override="${4:-}"
+
+    local settings_file base_url model
+    settings_file="$(_settings_file_for_provider "$provider")"
+    base_url="${base_url_override:-$(_base_url_for_provider "$provider")}"
+    model="${model_override:-$(_model_for_provider "$provider")}"
+
+    if [[ -z "${settings_file:-}" || -z "${base_url:-}" || -z "${model:-}" ]]; then
+        log_error "Unknown provider: $provider"
+        return 1
+    fi
+
+    mkdir -p "$CLAUDE_CONFIG_DIR"
+
+    local auth_key_name="ANTHROPIC_AUTH_TOKEN"
+    if [[ "$provider" == "kimi" ]]; then
+        auth_key_name="ANTHROPIC_API_KEY"
+    fi
+
+    (umask 077
+        cat > "$settings_file" << EOF
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "$base_url",
+    "$auth_key_name": "$token",
+    "API_TIMEOUT_MS": "3000000",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "ANTHROPIC_MODEL": "$model",
+    "ANTHROPIC_SMALL_FAST_MODEL": "$model",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "$model",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "$model",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "$model",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "$model"
+  }
+}
+EOF
+    )
+
+    chmod 600 "$settings_file" 2>/dev/null || true
+    log_success "Saved: $settings_file"
+}
+
+_configure_provider_interactive() {
+    local provider="${1:-}"
+    local settings_file
+    settings_file="$(_settings_file_for_provider "$provider")"
+
+    local current_token=""
+    current_token="$(_read_existing_token_from_settings "$settings_file" || true)"
+
+    local default_base_url default_model
+    default_base_url="$(_base_url_for_provider "$provider")"
+    default_model="$(_model_for_provider "$provider")"
+
+    local current_base_url current_model
+    current_base_url="$(_read_existing_value_from_settings "$settings_file" "ANTHROPIC_BASE_URL" || true)"
+    current_model="$(_read_existing_value_from_settings "$settings_file" "ANTHROPIC_MODEL" || true)"
+
+    local token=""
+    if [[ -n "${current_token:-}" ]]; then
+        echo "Current API key: ${current_token:0:12}..."
+        echo "Press Enter to keep it, or type a new key:"
+        read -r -p "> " token
+        if [[ -z "${token:-}" ]]; then
+            token="$current_token"
+        fi
+    else
+        echo "Enter API key (input hidden):"
+        read -r -s -p "> " token
+        echo ""
+    fi
+
+    if [[ -z "${token:-}" ]]; then
+        log_warn "No API token provided"
+        return 1
+    fi
+
+    local base_url model
+    base_url="${current_base_url:-$default_base_url}"
+    model="${current_model:-$default_model}"
+
+    # Migration hint: older installs used Moonshot's endpoint for Kimi. Prefer the new default.
+    if [[ "$provider" == "kimi" && "${base_url:-}" == *"moonshot.ai"* ]]; then
+        base_url="$default_base_url"
+    fi
+
+    echo "Base URL (Enter to keep: $base_url):"
+    read -r -p "> " input_url
+    if [[ -n "${input_url:-}" ]]; then
+        base_url="$input_url"
+    fi
+
+    echo "Model (Enter to keep: $model):"
+    read -r -p "> " input_model
+    if [[ -n "${input_model:-}" ]]; then
+        model="$input_model"
+    fi
+
+    _write_provider_settings "$provider" "$token" "$base_url" "$model"
+}
+
+# ============================================
 # Model Management
 # ============================================
 
@@ -59,7 +234,7 @@ get_model_for_alias() {
         claude-sonnet)    echo "claude-sonnet-4-5-20250515" ;;
         claude-haiku)     echo "claude-haiku-4-5-20250114" ;;
         claude-glm)       echo "glm-4.7" ;;
-        claude-kimi)      echo "kimi-k2-thinking" ;;
+        claude-kimi)      echo "kimi-k2.5" ;;
         claude-deepseek)  echo "deepseek-chat" ;;
         claude-qwen)      echo "qwen-plus" ;;
         claude-minimax)   echo "MiniMax-M2" ;;
@@ -248,45 +423,55 @@ cmd_use() {
 cmd_config() {
     local model_name="${1:-}"
 
-    # If no model specified, show interactive menu
+    # If no model specified, show interactive menu (repeatable)
     if [[ -z "${model_name:-}" ]]; then
-        echo -e "\n${color_bold}${color_blue}═══════════════════════════════════════════════════${color_reset}"
-        echo -e "${color_bold}${color_blue}  Select Model to Configure${color_reset}"
-        echo -e "${color_bold}${color_blue}═══════════════════════════════════════════════════${color_reset}"
-        echo ""
-        echo -e "  ${color_green}1${color_reset}. claude        (Anthropic Claude)"
-        echo -e "  ${color_green}2${color_reset}. glm           (Zhipu GLM)"
-        echo -e "  ${color_green}3${color_reset}. kimi          (Moonshot AI Kimi)"
-        echo -e "  ${color_green}4${color_reset}. deepseek      (DeepSeek)"
-        echo -e "  ${color_green}5${color_reset}. qwen          (Alibaba Qwen)"
-        echo -e "  ${color_green}6${color_reset}. minimax       (MiniMax)"
-        echo -e "  ${color_green}7${color_reset}. openrouter    (OpenRouter)"
-        echo ""
-        read -p "Select option (1-7): " -r choice
+        while true; do
+            echo -e "\n${color_bold}${color_blue}═══════════════════════════════════════════════════${color_reset}"
+            echo -e "${color_bold}${color_blue}  Configure Provider Settings${color_reset}"
+            echo -e "${color_bold}${color_blue}═══════════════════════════════════════════════════${color_reset}"
+            echo ""
+            echo -e "  ${color_green}1${color_reset}. glm   (GLM 4.7 / Z.ai)"
+            echo -e "  ${color_green}2${color_reset}. kimi  (Kimi 2.5 / Moonshot)"
+            echo -e "  ${color_green}3${color_reset}. exit"
+            echo ""
+            read -r -p "Select option (1-3): " choice
 
-        case "$choice" in
-            1) model_name="claude" ;;
-            2) model_name="glm" ;;
-            3) model_name="kimi" ;;
-            4) model_name="deepseek" ;;
-            5) model_name="qwen" ;;
-            6) model_name="minimax" ;;
-            7) model_name="openrouter" ;;
-            *)
-                log_error "Invalid selection"
-                return 1
-                ;;
-        esac
+            case "$choice" in
+                1) model_name="glm" ;;
+                2) model_name="kimi" ;;
+                3) return 0 ;;
+                *) log_warn "Invalid selection" ; continue ;;
+            esac
+
+            cmd_config "$model_name" || true
+            model_name=""
+        done
     fi
 
+    # Preferred path: write gist-compatible `*_settings.json` for supported providers
+    case "$model_name" in
+        glm|kimi)
+            echo -e "${color_bold}Configuring: ${color_blue}${model_name}${color_reset}"
+            _configure_provider_interactive "$model_name"
+            echo ""
+            echo -e "Now you can run:"
+            case "$model_name" in
+                glm)  echo -e "  ${color_blue}claude-glm${color_reset} (or ${color_blue}cluade-glm${color_reset})" ;;
+                kimi) echo -e "  ${color_blue}claude-kimi${color_reset} (or ${color_blue}cluade-kimi${color_reset})" ;;
+            esac
+            return 0
+            ;;
+    esac
+
+    # Legacy path (kept for compatibility): config.json via jq
     local config_file="$CLAUDE_CONFIG_DIR/config.json"
 
     # Get default base URL
     local default_url=""
     case "$model_name" in
         claude)      default_url="https://api.anthropic.com" ;;
-        glm)         default_url="https://api.z.ai/api/coding/paas/v4" ;;
-        kimi)        default_url="https://api.moonshot.ai/v1" ;;
+        glm)         default_url="https://api.z.ai/api/anthropic" ;;
+        kimi)        default_url="https://api.moonshot.ai/anthropic" ;;
         deepseek)    default_url="https://api.deepseek.com/anthropic" ;;
         qwen)        default_url="https://dashscope-intl.aliyuncs.com/apps/anthropic" ;;
         minimax)     default_url="https://api.minimax.io/anthropic" ;;
@@ -332,7 +517,7 @@ cmd_config() {
         jq --arg key "$token" --arg url "$default_url" ".${model_name} = {authToken: \$key, baseUrl: \$url}" "$config_file" > "$tmp"
         mv "$tmp" "$config_file"
     else
-        log_error "jq is required. Install with: brew install jq"
+        log_error "jq is required for config.json editing. For GLM/Kimi use: $SCRIPT_NAME config"
         return 1
     fi
 
@@ -359,75 +544,29 @@ cmd_setup() {
 
     mkdir -p "$CLAUDE_CONFIG_DIR"
 
-    local config_file="$CLAUDE_CONFIG_DIR/config.json"
+    while true; do
+        local glm_file kimi_file glm_ok kimi_ok
+        glm_file="$(_settings_file_for_provider glm)"
+        kimi_file="$(_settings_file_for_provider kimi)"
+        glm_ok="no"
+        kimi_ok="no"
+        [[ -n "$(_read_existing_token_from_settings "$glm_file" || true)" ]] && glm_ok="yes"
+        [[ -n "$(_read_existing_token_from_settings "$kimi_file" || true)" ]] && kimi_ok="yes"
 
-    # Initialize config file if not exists
-    if [[ ! -f "$config_file" ]]; then
-        cat > "$config_file" << 'EOF'
-{
-  "claude": {"authToken": "", "baseUrl": "https://api.anthropic.com"},
-  "glm": {"authToken": "", "baseUrl": "https://api.z.ai/api/coding/paas/v4"},
-  "kimi": {"authToken": "", "baseUrl": "https://api.moonshot.ai/v1"},
-  "deepseek": {"authToken": "", "baseUrl": "https://api.deepseek.com/anthropic"},
-  "qwen": {"authToken": "", "baseUrl": "https://dashscope-intl.aliyuncs.com/apps/anthropic"},
-  "minimax": {"authToken": "", "baseUrl": "https://api.minimax.io/anthropic"},
-  "openrouter": {"authToken": "", "baseUrl": "https://openrouter.ai/api"}
-}
-EOF
-    fi
+        echo -e "${color_bold}Configure API keys (repeatable)${color_reset}"
+        echo ""
+        echo -e "  ${color_green}1${color_reset}. GLM 4.7  (configured: ${glm_ok})"
+        echo -e "  ${color_green}2${color_reset}. Kimi 2.5 (configured: ${kimi_ok})"
+        echo -e "  ${color_green}3${color_reset}. Done"
+        echo ""
+        read -r -p "Select option (1-3): " choice
 
-    # Check for jq
-    if ! command -v jq &>/dev/null; then
-        log_error "jq is required for setup. Install with: brew install jq (macOS) or sudo apt-get install jq (Ubuntu)"
-        exit 1
-    fi
-
-    echo -e "${color_bold}Configure API Keys${color_reset}"
-    echo ""
-    echo -e "${color_yellow}Enter your API keys below. Press Enter to skip a model.${color_reset}"
-    echo ""
-
-    # Models to configure
-    local models=("claude" "glm" "kimi" "deepseek" "qwen" "minimax" "openrouter")
-    local model_names=("Claude (Anthropic)" "GLM (Zhipu)" "Kimi (Moonshot)" "DeepSeek" "Qwen (Alibaba)" "MiniMax" "OpenRouter")
-
-    for i in "${!models[@]}"; do
-        local model="${models[$i]}"
-        local name="${model_names[$i]}"
-
-        # Load existing key
-        local existing_key
-        existing_key=$(jq -r ".${model}.authToken // \"\"" "$config_file" 2>/dev/null)
-
-        # Check for existing keys in other locations for claude
-        if [[ "$model" == "claude" && -z "$existing_key" ]]; then
-            if [[ -f "$HOME/.anthropic-api-key" ]]; then
-                existing_key=$(cat "$HOME/.anthropic-api-key" 2>/dev/null)
-            elif [[ -n "${ANTHROPIC_AUTH_TOKEN:-}" ]]; then
-                existing_key="$ANTHROPIC_AUTH_TOKEN"
-            fi
-        fi
-
-        local key=""
-        if [[ -n "$existing_key" && "$existing_key" != "sk-your-api-key" && "$existing_key" != "sk-test-"* ]]; then
-            echo -e "${color_green}✓${color_reset} ${name} API key found: ${existing_key:0:15}..."
-            echo "  Press Enter to use, or type a new key:"
-            read -p "> " -r input
-            if [[ -n "$input" ]]; then
-                key="$input"
-            else
-                key="$existing_key"
-            fi
-        else
-            echo -n "${color_blue}${name} API Key${color_reset}: "
-            read -r key
-        fi
-
-        if [[ -n "$key" ]]; then
-            tmp=$(mktemp)
-            jq --arg k "$key" ".${model}.authToken = \$k" "$config_file" > "$tmp" && mv "$tmp" "$config_file"
-            log_success "${name} configuration saved"
-        fi
+        case "$choice" in
+            1) cmd_config glm || true ;;
+            2) cmd_config kimi || true ;;
+            3) break ;;
+            *) log_warn "Invalid selection" ;;
+        esac
         echo ""
     done
 
@@ -438,7 +577,7 @@ EOF
     echo -e "You can now use:"
     echo -e "  ${color_blue}claude${color_reset}           # Claude (Sonnet 4.5)"
     echo -e "  ${color_blue}claude-glm${color_reset}       # GLM 4.7"
-    echo -e "  ${color_blue}claude-kimi${color_reset}      # Kimi K2"
+    echo -e "  ${color_blue}claude-kimi${color_reset}      # Kimi 2.5"
     echo -e "  ${color_blue}claude-deepseek${color_reset}  # DeepSeek"
     echo -e "  ${color_blue}claude-qwen${color_reset}      # Qwen Plus"
     echo -e "  ${color_blue}claude-minimax${color_reset}   # MiniMax M2"

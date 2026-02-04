@@ -17,24 +17,18 @@ Convenient CLI commands to switch between different Claude Code models with ease
 git clone https://github.com/your-username/claude-code-model-switcher.git
 cd claude-code-model-switcher
 ./install.sh
-
-# Reload shell
-source ~/.zshrc  # or ~/.bashrc
-
-# Setup API keys (interactive)
-claude-model setup
 ```
 
 ## Usage
 
 ```bash
-# Default Claude (Sonnet 4.5)
+# Default Claude (passes --dangerously-skip-permissions by default)
 claude
 
 # GLM 4.7
 claude-glm
 
-# Kimi K2
+# Kimi 2.5
 claude-kimi
 
 # DeepSeek
@@ -52,42 +46,28 @@ claude-openrouter
 
 ## Setup
 
-After installation, run `claude-model setup` to configure all your API keys:
+The installer can optionally prompt you for only the API keys you want to configure.
+
+It writes provider settings files in `~/.claude/` (compatible with the referenced gist):
+
+- `~/.claude/zai_settings.json` (GLM 4.7)
+- `~/.claude/kimi_settings.json` (Kimi 2.5)
+
+Kimi expects:
+- `ANTHROPIC_BASE_URL=https://api.kimi.com/coding/`
+- `ANTHROPIC_API_KEY=...`
+
+For other providers, keep using `ANTHROPIC_AUTH_TOKEN` (no change).
+
+You can re-run configuration anytime:
 
 ```bash
-$ claude-model setup
-
-═══════════════════════════════════════════════════
-  Claude Code Model Switcher Setup
-═══════════════════════════════════════════════════
-
-Configure API Keys
-
-Claude API Key (Anthropic): sk-ant-xxx
-
-✓ Claude configuration saved
-
-GLM API Key (Z.ai): sk-glm-xxx
-
-✓ GLM configuration saved
-
-DeepSeek API Key: sk-deepseek-xxx
-
-✓ DeepSeek configuration saved
-
-═══════════════════════════════════════════════════
-  Setup Complete!
-═══════════════════════════════════════════════════
-
-You can now use:
-  claude           # Claude (Sonnet 4.5)
-  claude-glm       # GLM 4.7
-  claude-kimi      # Kimi K2
-  claude-deepseek  # DeepSeek
-  claude-qwen      # Qwen Plus
-  claude-minimax   # MiniMax M2
-  claude-openrouter # OpenRouter
+claude-model setup     # menu (repeatable)
+claude-model config    # configure one provider
 ```
+
+If you previously installed an older version that used shell aliases like `alias claude-glm='~/.claude/claude-glm.sh'`,
+the installer also writes legacy shim scripts so your existing shell keeps working.
 
 ## Available Models
 
@@ -95,7 +75,7 @@ You can now use:
 |---------|--------|----------|
 | `claude` | Sonnet 4.5 | Anthropic |
 | `claude-glm` | GLM 4.7 | Z.AI |
-| `claude-kimi` | Kimi K2 | Moonshot AI |
+| `claude-kimi` | Kimi 2.5 | Moonshot AI |
 | `claude-deepseek` | DeepSeek Chat | DeepSeek |
 | `claude-qwen` | Qwen Plus | Alibaba |
 | `claude-minimax` | MiniMax M2 | MiniMax |

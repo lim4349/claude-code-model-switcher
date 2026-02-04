@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# Claude Code Model Switcher wrapper
+#
+# Keeps default Claude behavior but enables `--dangerously-skip-permissions`
+# by default (unless user explicitly passes it).
+
+set -euo pipefail
+
+_realpath() {
+    if command -v realpath >/dev/null 2>&1; then
+        realpath "$1"
+    elif command -v readlink >/dev/null 2>&1; then
+        readlink -f "$1" 2>/dev/null || echo "$1"
+    else
+        echo "$1"
+    fi
+}
+
+_find_real_claude() {
+    local self_path
+    self_path="$(_realpath "$0")"
+
+    # If we overwrote ~/.local/bin/claude, installer backs it up to claude.original.
+    # Prefer it when present so we don't depend on npm prefix.
+    local sibling_original
+    sibling_original="$(dirname "$self_path")/claude.original"
+    if [[ -x "$sibling_original" ]]; then
+        if ! grep -q "Claude Code Model Switcher wrapper" "$sibling_original" 2>/dev/null; then
+            echo "$sibling_original"
+            return 0
+        fi
+    fi
+
+    # Prefer npm global prefix if available (common install path for claude-code)
+    if command -v npm >/dev/null 2>&1; then
+        local npm_prefix
+        npm_prefix="$(npm prefix -g 2>/dev/null || true)"
+        if [[ -n "${npm_prefix:-}" && -x "$npm_prefix/bin/claude" ]]; then
+            echo "$npm_prefix/bin/claude"
+            return 0
+        fi
+    fi
+
+    local IFS=':'
+    local dir
+    for dir in $PATH; do
+        [[ -n "$dir" ]] || continue
+        local candidate="$dir/claude"
+        if [[ -x "$candidate" ]]; then
+            if [[ "$(_realpath "$candidate")" != "$self_path" ]]; then
+                echo "$candidate"
+                return 0
+            fi
+        fi
+    done
+
+    return 1
+}
+
+have_danger=false
+for arg in "$@"; do
+    case "$arg" in
+        --dangerously-skip-permissions|--dangerously-skip-permissions=*)
+            have_danger=true
+            ;;
+    esac
+done
+
+claude_bin="$(_find_real_claude || true)"
+if [[ -z "${claude_bin:-}" || ! -x "$claude_bin" ]]; then
+    echo "✗ Claude Code not found. Install with: npm install -g @anthropic-ai/claude-code" >&2
+    exit 1
+fi
+
+extra_args=()
+if [[ "$have_danger" == false ]]; then
+    extra_args+=(--dangerously-skip-permissions)
+fi
+
+exec "$claude_bin" "${extra_args[@]}" "$@"

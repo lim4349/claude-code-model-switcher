@@ -8,9 +8,11 @@ set -euo pipefail
 # ============================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-INSTALL_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 LOCAL_BIN_DIR="${LOCAL_BIN_DIR:-$HOME/.local/bin}"
 SOURCE_SCRIPT="$SCRIPT_DIR/claude-code-model-switcher.sh"
+WRAPPERS_DIR="$SCRIPT_DIR/wrappers"
+
+CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 
 # ============================================
 # Colors
@@ -64,12 +66,17 @@ check_prerequisites() {
 }
 
 create_install_dir() {
-    if [[ ! -d "$INSTALL_DIR" ]]; then
-        log_info "Creating install directory: $INSTALL_DIR"
-        mkdir -p "$INSTALL_DIR"
+    if [[ ! -d "$CLAUDE_CONFIG_DIR" ]]; then
+        log_info "Creating Claude config directory: $CLAUDE_CONFIG_DIR"
+        mkdir -p "$CLAUDE_CONFIG_DIR"
     fi
 
-    # Detect shell config file
+    if [[ ! -d "$LOCAL_BIN_DIR" ]]; then
+        log_info "Creating local bin directory: $LOCAL_BIN_DIR"
+        mkdir -p "$LOCAL_BIN_DIR"
+    fi
+
+    # Detect shell config file (only used for PATH hints)
     if [[ -n "${ZSH_VERSION:-}" ]]; then
         SHELL_RC="$HOME/.zshrc"
         SHELL_NAME="zsh"
@@ -86,93 +93,197 @@ create_install_dir() {
 install_main_script() {
     log_info "Installing main script..."
 
-    # Copy to install directory
     if [[ -f "$SOURCE_SCRIPT" ]]; then
-        cp "$SOURCE_SCRIPT" "$INSTALL_DIR/claude-model"
-        chmod +x "$INSTALL_DIR/claude-model"
-        log_success "Installed 'claude-model' to: $INSTALL_DIR/claude-model"
-
-        # Also copy to ~/.local/bin for PATH access
-        if [[ -d "$LOCAL_BIN_DIR" ]] || mkdir -p "$LOCAL_BIN_DIR" 2>/dev/null; then
-            cp "$SOURCE_SCRIPT" "$LOCAL_BIN_DIR/claude-model"
-            chmod +x "$LOCAL_BIN_DIR/claude-model"
-            log_success "Installed 'claude-model' to: $LOCAL_BIN_DIR/claude-model"
-        fi
+        cp "$SOURCE_SCRIPT" "$LOCAL_BIN_DIR/claude-model"
+        chmod +x "$LOCAL_BIN_DIR/claude-model"
+        log_success "Installed 'claude-model' to: $LOCAL_BIN_DIR/claude-model"
     else
         log_warn "Main script not found at: $SOURCE_SCRIPT"
     fi
 }
 
-install_wrapper_scripts() {
-    log_info "Installing wrapper scripts..."
+install_legacy_shims() {
+    log_info "Installing legacy shims into $CLAUDE_CONFIG_DIR..."
 
-    # Copy wrapper scripts to ~/.claude/
-    local wrappers=("claude.sh" "claude-glm.sh" "claude-kimi.sh" "claude-deepseek.sh" "claude-qwen.sh" "claude-minimax.sh" "claude-openrouter.sh")
+    mkdir -p "$CLAUDE_CONFIG_DIR"
 
-    for wrapper in "${wrappers[@]}"; do
-        if [[ -f "$SCRIPT_DIR/.claude/$wrapper" ]]; then
-            cp "$SCRIPT_DIR/.claude/$wrapper" "$INSTALL_DIR/"
-            chmod +x "$INSTALL_DIR/$wrapper"
-            log_success "Installed: $wrapper"
-        else
-            log_warn "Wrapper not found: $wrapper"
-        fi
+    # These files exist to support older aliases like:
+    #   alias claude-glm='~/.claude/claude-glm.sh'
+    # so existing shells keep working without requiring manual cleanup.
+    local shim
+    for shim in "claude.sh:claude" "claude-glm.sh:claude-glm" "claude-kimi.sh:claude-kimi"; do
+        local shim_name="${shim%%:*}"
+        local cmd_name="${shim##*:}"
+        local shim_path="$CLAUDE_CONFIG_DIR/$shim_name"
+
+        cat > "$shim_path" << EOF
+#!/usr/bin/env bash
+set -euo pipefail
+
+if command -v "$cmd_name" >/dev/null 2>&1; then
+  exec "$cmd_name" "\$@"
+fi
+
+if [[ -x "$LOCAL_BIN_DIR/$cmd_name" ]]; then
+  exec "$LOCAL_BIN_DIR/$cmd_name" "\$@"
+fi
+
+echo "✗ Command not found: $cmd_name" >&2
+echo "  Ensure $LOCAL_BIN_DIR is on your PATH." >&2
+exit 1
+EOF
+        chmod +x "$shim_path"
+        log_success "Installed: $shim_path"
     done
 }
 
-add_shell_aliases() {
-    log_info "Adding aliases..."
+remove_old_aliases() {
+    log_info "Cleaning old shell aliases (if any)..."
 
-    # Add to .bashrc
-    local bashrc="$HOME/.bashrc"
-    if [[ -f "$bashrc" ]]; then
-        sed -i.bak '/# Claude Code Model Switcher/d' "$bashrc" 2>/dev/null || true
-        sed -i.bak '/alias claude=/d' "$bashrc" 2>/dev/null || true
-        sed -i.bak '/alias claude-glm=/d' "$bashrc" 2>/dev/null || true
-        sed -i.bak '/alias claude-kimi=/d' "$bashrc" 2>/dev/null || true
-        sed -i.bak '/alias claude-deepseek=/d' "$bashrc" 2>/dev/null || true
-        sed -i.bak '/alias claude-qwen=/d' "$bashrc" 2>/dev/null || true
-        sed -i.bak '/alias claude-minimax=/d' "$bashrc" 2>/dev/null || true
-        sed -i.bak '/alias claude-openrouter=/d' "$bashrc" 2>/dev/null || true
+    # Remove the old alias block and any direct aliases that point to ~/.claude/*.sh
+    # User may still need to restart shell for current session.
+    local configs=("$HOME/.bashrc" "$HOME/.zshrc")
+    local cfg
 
-        cat >> "$bashrc" << 'EOF'
+    for cfg in "${configs[@]}"; do
+        [[ -f "$cfg" ]] || continue
 
-# Claude Code Model Switcher
-alias claude='~/.claude/claude.sh'              # Claude (Sonnet 4.5)
-alias claude-glm='~/.claude/claude-glm.sh'      # GLM 4.7
-alias claude-kimi='~/.claude/claude-kimi.sh'    # Kimi K2
-alias claude-deepseek='~/.claude/claude-deepseek.sh'    # DeepSeek
-alias claude-qwen='~/.claude/claude-qwen.sh'            # Qwen Plus
-alias claude-minimax='~/.claude/claude-minimax.sh'     # MiniMax M2
-alias claude-openrouter='~/.claude/claude-openrouter.sh' # OpenRouter
-EOF
-        log_success "Aliases added to: $bashrc"
+        cp "$cfg" "$cfg.bak" 2>/dev/null || true
+
+        # Remove any previous block header and known aliases (linux-compatible sed)
+        sed -i '/# Claude Code Model Switcher/d' "$cfg" 2>/dev/null || true
+        sed -i '/alias claude=/d' "$cfg" 2>/dev/null || true
+        sed -i '/alias claude-glm=/d' "$cfg" 2>/dev/null || true
+        sed -i '/alias claude-kimi=/d' "$cfg" 2>/dev/null || true
+        sed -i '/alias cluade-glm=/d' "$cfg" 2>/dev/null || true
+        sed -i '/alias cluade-kimi=/d' "$cfg" 2>/dev/null || true
+    done
+}
+
+install_wrapper_scripts() {
+    log_info "Installing wrapper commands..."
+
+    if [[ ! -d "$WRAPPERS_DIR" ]]; then
+        log_error "Wrappers directory not found: $WRAPPERS_DIR"
+        exit 1
     fi
 
-    # Add to .zshrc
-    local zshrc="$HOME/.zshrc"
-    if [[ -f "$zshrc" ]]; then
-        sed -i.bak '/# Claude Code Model Switcher/d' "$zshrc" 2>/dev/null || true
-        sed -i.bak '/alias claude=/d' "$zshrc" 2>/dev/null || true
-        sed -i.bak '/alias claude-glm=/d' "$zshrc" 2>/dev/null || true
-        sed -i.bak '/alias claude-kimi=/d' "$zshrc" 2>/dev/null || true
-        sed -i.bak '/alias claude-deepseek=/d' "$zshrc" 2>/dev/null || true
-        sed -i.bak '/alias claude-qwen=/d' "$zshrc" 2>/dev/null || true
-        sed -i.bak '/alias claude-minimax=/d' "$zshrc" 2>/dev/null || true
-        sed -i.bak '/alias claude-openrouter=/d' "$zshrc" 2>/dev/null || true
+    # Also install `cluade-*` typos as compatibility aliases (requested)
+    local wrappers=("claude" "claude-glm" "claude-kimi" "cluade-glm" "cluade-kimi")
 
-        cat >> "$zshrc" << 'EOF'
+    for wrapper in "${wrappers[@]}"; do
+        if [[ ! -f "$WRAPPERS_DIR/$wrapper" ]]; then
+            log_error "Missing wrapper template: $WRAPPERS_DIR/$wrapper"
+            exit 1
+        fi
 
-# Claude Code Model Switcher
-alias claude='~/.claude/claude.sh'              # Claude (Sonnet 4.5)
-alias claude-glm='~/.claude/claude-glm.sh'      # GLM 4.7
-alias claude-kimi='~/.claude/claude-kimi.sh'    # Kimi K2
-alias claude-deepseek='~/.claude/claude-deepseek.sh'    # DeepSeek
-alias claude-qwen='~/.claude/claude-qwen.sh'            # Qwen Plus
-alias claude-minimax='~/.claude/claude-minimax.sh'     # MiniMax M2
-alias claude-openrouter='~/.claude/claude-openrouter.sh' # OpenRouter
+        # Backup an existing `claude` in ~/.local/bin only (optional)
+        if [[ "$wrapper" == "claude" && -f "$LOCAL_BIN_DIR/claude" ]]; then
+            if ! grep -q "Claude Code Model Switcher wrapper" "$LOCAL_BIN_DIR/claude" 2>/dev/null; then
+                if [[ ! -f "$LOCAL_BIN_DIR/claude.original" ]]; then
+                    cp "$LOCAL_BIN_DIR/claude" "$LOCAL_BIN_DIR/claude.original"
+                    chmod +x "$LOCAL_BIN_DIR/claude.original" || true
+                    log_warn "Backed up existing $LOCAL_BIN_DIR/claude to $LOCAL_BIN_DIR/claude.original"
+                fi
+            fi
+        fi
+
+        # Avoid `cp -> Text file busy` when overwriting an in-use executable:
+        # write a temp file then atomically rename over the destination.
+        local tmp
+        tmp="$(mktemp "$LOCAL_BIN_DIR/.${wrapper}.tmp.XXXXXX")"
+        cp "$WRAPPERS_DIR/$wrapper" "$tmp"
+        chmod +x "$tmp"
+        mv -f "$tmp" "$LOCAL_BIN_DIR/$wrapper"
+        log_success "Installed: $LOCAL_BIN_DIR/$wrapper"
+    done
+}
+
+write_provider_settings() {
+    local name="$1"
+    local base_url="$2"
+    local model="$3"
+    local token="$4"
+    local auth_key_name="${5:-ANTHROPIC_AUTH_TOKEN}"
+    local settings_file="$CLAUDE_CONFIG_DIR/${name}_settings.json"
+
+    (umask 077
+        cat > "$settings_file" << EOF
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "$base_url",
+    "$auth_key_name": "$token",
+    "API_TIMEOUT_MS": "3000000",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "ANTHROPIC_MODEL": "$model",
+    "ANTHROPIC_SMALL_FAST_MODEL": "$model",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "$model",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "$model",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "$model",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "$model"
+  }
+}
 EOF
-        log_success "Aliases added to: $zshrc"
+    )
+
+    chmod 600 "$settings_file" 2>/dev/null || true
+    log_success "Wrote settings: $settings_file"
+}
+
+configure_api_keys() {
+    echo ""
+    echo -e "${color_bold}${color_blue}Configure API Keys (optional)${color_reset}"
+    echo -e "${color_yellow}Choose only the providers you want to use now.${color_reset}"
+    echo ""
+    echo "  1) GLM 4.7 (Z.ai)"
+    echo "  2) Kimi 2.5 (Moonshot)"
+    echo ""
+    read -p "Enter choices (e.g. 1 2), or press Enter to skip: " -r choices
+
+    if [[ -z "${choices// }" ]]; then
+        log_info "Skipping API key configuration"
+        return 0
+    fi
+
+    local choice
+    for choice in $choices; do
+        case "$choice" in
+            1)
+                echo ""
+                read -r -s -p "GLM API key: " glm_key
+                echo ""
+                if [[ -n "${glm_key:-}" ]]; then
+                    write_provider_settings "zai" "https://api.z.ai/api/anthropic" "glm-4.7" "$glm_key" "ANTHROPIC_AUTH_TOKEN"
+                else
+                    log_warn "Skipped GLM (empty key)"
+                fi
+                ;;
+            2)
+                echo ""
+                read -r -s -p "Kimi API key: " kimi_key
+                echo ""
+                if [[ -n "${kimi_key:-}" ]]; then
+                    write_provider_settings "kimi" "https://api.kimi.com/coding/" "kimi-k2.5" "$kimi_key" "ANTHROPIC_API_KEY"
+                else
+                    log_warn "Skipped Kimi (empty key)"
+                fi
+                ;;
+            *)
+                log_warn "Unknown choice: $choice (skipped)"
+                ;;
+        esac
+    done
+}
+
+ensure_path_hint() {
+    if [[ ":$PATH:" == *":$LOCAL_BIN_DIR:"* ]]; then
+        return 0
+    fi
+
+    log_warn "$LOCAL_BIN_DIR is not in your PATH"
+    if [[ -n "${SHELL_RC:-}" ]]; then
+        log_info "To enable the commands in new shells, add this to $SHELL_RC:"
+        echo "  export PATH=\"$LOCAL_BIN_DIR:\$PATH\""
     fi
 }
 
@@ -183,22 +294,12 @@ show_post_install() {
     echo -e "${color_bold}${color_green}═════════════════════════════════════════════════${color_reset}"
     echo ""
     echo -e "${color_yellow}⚠ Next Step:${color_reset}"
-    echo "  1. Reload your shell:"
-    echo -e "     ${color_blue}source $SHELL_RC${color_reset}"
-    echo ""
-    echo "  2. Setup API keys:"
-    echo -e "     ${color_blue}claude-model setup${color_reset}"
-    echo "     or"
-    echo -e "     ${color_blue}claude-model config${color_reset}  # Interactive menu"
+    echo "  If the commands aren't found, ensure $LOCAL_BIN_DIR is on your PATH."
     echo ""
     echo -e "${color_bold}Available Commands:${color_reset}"
-    echo -e "  ${color_blue}claude${color_reset}           # Claude (Sonnet 4.5)"
+    echo -e "  ${color_blue}claude${color_reset}           # Claude (default) + --dangerously-skip-permissions"
     echo -e "  ${color_blue}claude-glm${color_reset}       # GLM 4.7"
-    echo -e "  ${color_blue}claude-kimi${color_reset}      # Kimi K2"
-    echo -e "  ${color_blue}claude-deepseek${color_reset}  # DeepSeek"
-    echo -e "  ${color_blue}claude-qwen${color_reset}      # Qwen Plus"
-    echo -e "  ${color_blue}claude-minimax${color_reset}   # MiniMax M2"
-    echo -e "  ${color_blue}claude-openrouter${color_reset} # OpenRouter"
+    echo -e "  ${color_blue}claude-kimi${color_reset}      # Kimi 2.5"
     echo ""
 }
 
@@ -214,8 +315,11 @@ main() {
     check_prerequisites
     create_install_dir
     install_main_script
+    install_legacy_shims
+    remove_old_aliases
     install_wrapper_scripts
-    add_shell_aliases
+    configure_api_keys
+    ensure_path_hint
     show_post_install
 }
 

@@ -11,7 +11,7 @@ INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 COMPLETION_DIR="$HOME/.claude-code-model-switcher"
 CLAUDE_CONFIG_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 CLAUDE_SETTINGS_FILE="$CLAUDE_CONFIG_DIR/settings.json"
-SCRIPTS=("claude-model" "claude" "claude-glm" "claude-kimi" "claude-deepseek" "claude-qwen" "claude-minimax" "claude-openrouter" "claude-opus" "claude-sonnet" "claude-haiku")
+SCRIPTS=("claude-model" "claude" "claude-glm" "claude-kimi" "cluade-glm" "cluade-kimi" "claude-deepseek" "claude-qwen" "claude-minimax" "claude-openrouter" "claude-opus" "claude-sonnet" "claude-haiku")
 
 # ============================================
 # Colors
