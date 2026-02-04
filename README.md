@@ -1,194 +1,96 @@
 # Claude Code Model Switcher
 
-Convenient CLI commands to switch between different Claude Code models with ease.
+Claude Code CLI에서 다양한 AI 모델을 쉽게 전환해서 사용할 수 있는 도구입니다.
 
-## Features
+---
 
-- **Simple Commands**: `claude`, `claude-glm`, `claude-kimi`, `claude-deepseek`, etc.
-- **Auto Configuration**: Automatically loads API keys from config file
-- **Easy Installation**: One-line installer script
-- **Multiple Models**: Support for 7+ AI providers (Claude, GLM, Kimi, DeepSeek, Qwen, MiniMax, OpenRouter)
-- **Interactive Setup**: Easy configuration menu
+## 설치
 
-## Installation
+### 전제 조건
 
 ```bash
-# Clone and install
+npm install -g @anthropic-ai/claude-code
+```
+
+### 설치
+
+```bash
 git clone https://github.com/your-username/claude-code-model-switcher.git
 cd claude-code-model-switcher
 ./install.sh
 ```
 
-## Usage
+### 설치 후
+
+새로운 터미널을 열거나 다음을 실행하세요:
 
 ```bash
-# Default Claude (passes --dangerously-skip-permissions by default)
-claude
-
-# GLM 4.7
-claude-glm
-
-# Kimi 2.5
-claude-kimi
-
-# DeepSeek
-claude-deepseek
-
-# Qwen Plus
-claude-qwen
-
-# MiniMax M2
-claude-minimax
-
-# OpenRouter (100+ models)
-claude-openrouter
+source ~/.bashrc   # 또는 source ~/.zshrc
 ```
 
-## Setup
+---
 
-The installer can optionally prompt you for only the API keys you want to configure.
+## 사용법
 
-It writes provider settings files in `~/.claude/` (compatible with the referenced gist):
-
-- `~/.claude/zai_settings.json` (GLM 4.7)
-- `~/.claude/kimi_settings.json` (Kimi 2.5)
-
-Kimi expects:
-- `ANTHROPIC_BASE_URL=https://api.kimi.com/coding/`
-- `ANTHROPIC_API_KEY=...`
-
-For other providers, keep using `ANTHROPIC_AUTH_TOKEN` (no change).
-
-You can re-run configuration anytime:
+### 1. API 키 설정
 
 ```bash
-claude-model setup     # menu (repeatable)
-claude-model config    # configure one provider
+claude-model setup
 ```
 
-If you previously installed an older version that used shell aliases like `alias claude-glm='~/.claude/claude-glm.sh'`,
-the installer also writes legacy shim scripts so your existing shell keeps working.
+GLM, Kimi 중 원하는 모델의 API 키를 입력하세요.
 
-## Available Models
+### 2. 모델 실행
 
-| Command | Model | Provider |
-|---------|--------|----------|
-| `claude` | Sonnet 4.5 | Anthropic |
+| 명령어 | 모델 | 제공업체 |
+|--------|------|----------|
+| `claude` | Claude Sonnet 4.5 | Anthropic |
 | `claude-glm` | GLM 4.7 | Z.AI |
 | `claude-kimi` | Kimi 2.5 | Moonshot AI |
-| `claude-deepseek` | DeepSeek Chat | DeepSeek |
-| `claude-qwen` | Qwen Plus | Alibaba |
-| `claude-minimax` | MiniMax M2 | MiniMax |
-| `claude-openrouter` | 100+ models | OpenRouter |
 
-## Pricing Comparison
-
-| Provider | Input $/1M | Output $/1M | vs Claude |
-|----------|-----------|-------------|----------|
-| Claude Sonnet 4.5 | $3.00 | $15.00 | 1x |
-| DeepSeek | $0.28 | $0.42 | **~90% cheaper** |
-| GLM 4.6 | $0.60 | $2.20 | ~80% cheaper |
-| Kimi K2 | $0.14 | $2.49 | ~85% cheaper |
-| Qwen Plus | $0.22 | $0.95 | ~90% cheaper |
-| MiniMax M2 | $0.30 | $1.20 | ~90% cheaper |
-
-## Configuration
-
-Configuration is stored in `~/.claude/config.json`:
-
-```json
-{
-  "claude": {
-    "authToken": "sk-ant-your-key",
-    "baseUrl": "https://api.anthropic.com"
-  },
-  "glm": {
-    "authToken": "sk-glm-your-key",
-    "baseUrl": "https://api.z.ai/api/coding/paas/v4"
-  },
-  "kimi": {
-    "authToken": "sk-kimi-your-key",
-    "baseUrl": "https://api.moonshot.ai/v1"
-  },
-  "deepseek": {
-    "authToken": "sk-deepseek-your-key",
-    "baseUrl": "https://api.deepseek.com/anthropic"
-  },
-  "qwen": {
-    "authToken": "sk-qwen-your-key",
-    "baseUrl": "https://dashscope-intl.aliyuncs.com/apps/anthropic"
-  },
-  "minimax": {
-    "authToken": "sk-minimax-your-key",
-    "baseUrl": "https://api.minimax.io/anthropic"
-  },
-  "openrouter": {
-    "authToken": "sk-or-your-key",
-    "baseUrl": "https://openrouter.ai/api"
-  }
-}
+```bash
+claude          # Claude
+claude-glm      # GLM
+claude-kimi     # Kimi
 ```
 
-### Get API Keys
+### 3. 관리 명령어
 
-| Provider | URL |
-|----------|-----|
+```bash
+claude-model setup      # API 키 설정 (반복 가능)
+claude-model config     # 개별 모델 설정
+claude-model current    # 현재 모델 확인
+claude-model list       # 사용 가능한 모델 목록
+```
+
+---
+
+## API 키 발급
+
+| 제공업체 | 링크 |
+|----------|------|
 | **Claude** | https://console.anthropic.com/ |
 | **GLM** | https://open.bigmodel.cn/ |
 | **Kimi** | https://platform.moonshot.ai/ |
-| **DeepSeek** | https://platform.deepseek.com/ |
-| **Qwen** | https://dashscope-intl.aliyuncs.com/ |
-| **MiniMax** | https://platform.minimax.io/ |
-| **OpenRouter** | https://openrouter.ai/keys |
 
-## Management Commands
+---
 
-```bash
-# Setup all API keys at once (interactive)
-claude-model setup
-
-# Configure specific model (interactive menu)
-claude-model config
-
-# Configure specific model directly
-claude-model config deepseek
-
-# Show current default model
-claude-model current
-
-# List all available models
-claude-model list
-
-# Set default model without running
-claude-model set claude-opus
-
-# Run with specific model
-claude-model use claude-glm
-```
-
-## How It Works
-
-Each command uses its own dedicated script:
-
-```
-claude-glm → ~/.claude/claude-glm.sh → Sets GLM env vars → Launches Claude Code
-claude → ~/.claude/claude.sh → Uses Claude env vars → Launches Claude Code
-```
-
-The wrapper scripts:
-1. Load configuration from `~/.claude/config.json`
-2. Set environment variables (`ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_BASE_URL`, model settings)
-3. Find and launch the original Claude Code binary
-
-## Uninstall
-
-To completely remove Claude Code Model Switcher:
+## 삭제
 
 ```bash
 cd claude-code-model-switcher
 ./uninstall.sh
 ```
 
-## License
+API 키 설정 파일은 삭제되지 않습니다. 수동으로 삭제하려면:
+
+```bash
+rm ~/.claude/zai_settings.json
+rm ~/.claude/kimi_settings.json
+```
+
+---
+
+## 라이선스
 
 MIT

@@ -32,19 +32,19 @@ color_red='\033[31m'
 # ============================================
 
 log_info() {
-    echo -e "${color_blue}ℹ${color_reset} $*"
+    printf "%bℹ%b %s\n" "${color_blue}" "${color_reset}" "$*"
 }
 
 log_success() {
-    echo -e "${color_green}✓${color_reset} $*"
+    printf "%b✓%b %s\n" "${color_green}" "${color_reset}" "$*"
 }
 
 log_warn() {
-    echo -e "${color_yellow}⚠${color_reset} $*"
+    printf "%b⚠%b %s\n" "${color_yellow}" "${color_reset}" "$*"
 }
 
 log_error() {
-    echo -e "${color_red}✗${color_reset} $*" >&2
+    printf "%b✗%b %s\n" "${color_red}" "${color_reset}" "$*" >&2
 }
 
 # ============================================
@@ -229,17 +229,13 @@ _configure_provider_interactive() {
 get_model_for_alias() {
     local alias="${1:-}"
     case "$alias" in
-        claude)           echo "claude-sonnet-4-5-20250515" ;;
-        claude-opus)      echo "claude-opus-4-5-20251101" ;;
-        claude-sonnet)    echo "claude-sonnet-4-5-20250515" ;;
-        claude-haiku)     echo "claude-haiku-4-5-20250114" ;;
-        claude-glm)       echo "glm-4.7" ;;
-        claude-kimi)      echo "kimi-k2.5" ;;
-        claude-deepseek)  echo "deepseek-chat" ;;
-        claude-qwen)      echo "qwen-plus" ;;
-        claude-minimax)   echo "MiniMax-M2" ;;
-        claude-openrouter)echo "anthropic/claude-sonnet-4-5-20250515" ;;
-        *)                echo "" ;;
+        claude)        echo "claude-sonnet-4-5-20250515" ;;
+        claude-opus)   echo "claude-opus-4-5-20251101" ;;
+        claude-sonnet) echo "claude-sonnet-4-5-20250515" ;;
+        claude-haiku)  echo "claude-haiku-4-5-20250114" ;;
+        claude-glm)    echo "glm-4.7" ;;
+        claude-kimi)   echo "kimi-k2.5" ;;
+        *)             echo "" ;;
     esac
 }
 
@@ -287,24 +283,22 @@ list_models() {
     local current model alias
     current=$(get_current_model)
 
-    echo -e "\n${color_bold}Available Model Presets:${color_reset}\n"
+    printf "\n%bAvailable Model Presets:%b\n\n" "${color_bold}" "${color_reset}"
 
-    # List all models
-    for alias in claude claude-opus claude-sonnet claude-haiku claude-glm claude-kimi claude-deepseek claude-qwen claude-minimax claude-openrouter; do
+    # List only supported models
+    for alias in claude claude-opus claude-sonnet claude-haiku claude-glm claude-kimi; do
         model=$(get_model_for_alias "$alias")
         local is_current=""
         if [[ "${model:-}" == "${current:-}" ]]; then
-            is_current="${color_green} [CURRENT]${color_reset}"
+            is_current=" ${color_green}[CURRENT]${color_reset}"
         fi
         if [[ "$alias" == "claude" ]]; then
-            echo -e "  ${color_green}${alias}${color_reset} → $model${is_current}"
+            printf "  %b%s%b → %s%b\n" "${color_green}" "${alias}" "${color_reset}" "${model}" "${is_current}"
         else
-            echo -e "  ${color_blue}${alias}${color_reset} → $model${is_current}"
+            printf "  %b%s%b → %s%b\n" "${color_blue}" "${alias}" "${color_reset}" "${model}" "${is_current}"
         fi
     done
-    echo ""
-    echo -e "Current default model: ${color_bold}${current:-default}${color_reset}"
-    echo ""
+    printf "\nCurrent default model: %b%s%b\n\n" "${color_bold}" "${current:-default}" "${color_reset}"
 }
 
 # ============================================
@@ -379,7 +373,7 @@ run_claude_code() {
 cmd_current() {
     local current
     current=$(get_current_model)
-    echo "Current default model: ${color_bold}${current:-default}${color_reset}"
+    printf "Current default model: %b%s%b\n" "${color_bold}" "${current:-default}" "${color_reset}"
 }
 
 cmd_list() {
@@ -578,10 +572,6 @@ cmd_setup() {
     echo -e "  ${color_blue}claude${color_reset}           # Claude (Sonnet 4.5)"
     echo -e "  ${color_blue}claude-glm${color_reset}       # GLM 4.7"
     echo -e "  ${color_blue}claude-kimi${color_reset}      # Kimi 2.5"
-    echo -e "  ${color_blue}claude-deepseek${color_reset}  # DeepSeek"
-    echo -e "  ${color_blue}claude-qwen${color_reset}      # Qwen Plus"
-    echo -e "  ${color_blue}claude-minimax${color_reset}   # MiniMax M2"
-    echo -e "  ${color_blue}claude-openrouter${color_reset} # OpenRouter"
     echo ""
 }
 
@@ -616,7 +606,8 @@ EOF
 
  ${color_bold}CONFIGURATION${color_reset}
      $SCRIPT_NAME config              # Interactive menu to select model
-     $SCRIPT_NAME config deepseek     # Configure DeepSeek API
+     $SCRIPT_NAME config glm          # Configure GLM API
+     $SCRIPT_NAME config kimi         # Configure Kimi API
 
  ${color_bold}QUICK ALIASES${color_reset}
      You can also use direct commands:
@@ -625,20 +616,12 @@ EOF
      ${color_blue}claude-sonnet${color_reset}       # Claude Sonnet 4.5
      ${color_blue}claude-haiku${color_reset}        # Claude Haiku 4.5
      ${color_blue}claude-glm${color_reset}          # GLM 4.7
-     ${color_blue}claude-kimi${color_reset}         # Kimi K2
-     ${color_blue}claude-deepseek${color_reset}     # DeepSeek
-     ${color_blue}claude-qwen${color_reset}         # Qwen Plus
-     ${color_blue}claude-minimax${color_reset}      # MiniMax M2
-     ${color_blue}claude-openrouter${color_reset}   # OpenRouter
+     ${color_blue}claude-kimi${color_reset}         # Kimi 2.5
 
  ${color_bold}SUPPORTED MODELS${color_reset}
      ${color_green}Claude${color_reset}         Anthropic official (Sonnet, Opus, Haiku)
-     ${color_green}GLM${color_reset}            Zhipu AI (glm-4.7, glm-4.5-air)
-     ${color_green}Kimi${color_reset}           Moonshot AI (kimi-k2-thinking)
-     ${color_green}DeepSeek${color_reset}       DeepSeek (deepseek-chat, deepseek-reasoner)
-     ${color_green}Qwen${color_reset}           Alibaba (qwen-plus, qwen-max, qwen-coder)
-     ${color_green}MiniMax${color_reset}        MiniMax (MiniMax-M2)
-     ${color_green}OpenRouter${color_reset}     100+ models via openrouter.ai
+     ${color_green}GLM${color_reset}            Z.AI (glm-4.7)
+     ${color_green}Kimi${color_reset}           Moonshot AI (kimi-k2.5)
 
 EOF
 }
