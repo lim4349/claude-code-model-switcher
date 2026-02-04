@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-# Compatibility wrapper (typo alias): cluade-kimi -> claude-kimi
-
-set -euo pipefail
-exec "$(dirname "$0")/claude-kimi" "$@"

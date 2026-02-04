@@ -155,8 +155,6 @@ remove_old_aliases() {
         sed -i '/alias claude=/d' "$cfg" 2>/dev/null || true
         sed -i '/alias claude-glm=/d' "$cfg" 2>/dev/null || true
         sed -i '/alias claude-kimi=/d' "$cfg" 2>/dev/null || true
-        sed -i '/alias cluade-glm=/d' "$cfg" 2>/dev/null || true
-        sed -i '/alias cluade-kimi=/d' "$cfg" 2>/dev/null || true
     done
 }
 
@@ -168,8 +166,7 @@ install_wrapper_scripts() {
         exit 1
     fi
 
-    # Also install `cluade-*` typos as compatibility aliases (requested)
-    local wrappers=("claude" "claude-glm" "claude-kimi" "cluade-glm" "cluade-kimi")
+    local wrappers=("claude" "claude-glm" "claude-kimi")
 
     for wrapper in "${wrappers[@]}"; do
         if [[ ! -f "$WRAPPERS_DIR/$wrapper" ]]; then
@@ -275,6 +272,43 @@ configure_api_keys() {
     done
 }
 
+configure_dangerous_mode() {
+    local config_file="$CLAUDE_CONFIG_DIR/.model-switcher-config"
+
+    echo ""
+    echo -e "${color_bold}${color_blue}Safety Mode Configuration${color_reset}"
+    echo ""
+    echo -e "${color_yellow}--dangerously-skip-permissions${color_reset} bypasses Claude's safety prompts."
+    echo "This allows Claude to execute commands without asking for confirmation."
+    echo ""
+    echo "  1) Enable by default (no confirmation prompts)"
+    echo "  2) Disable by default (use --dangerously-skip-permissions flag manually)"
+    echo ""
+    read -p "Choose [1/2] (default: 2): " -r danger_choice
+
+    local auto_danger="false"
+    case "${danger_choice:-2}" in
+        1)
+            auto_danger="true"
+            log_success "Auto --dangerously-skip-permissions: ENABLED"
+            ;;
+        *)
+            auto_danger="false"
+            log_success "Auto --dangerously-skip-permissions: DISABLED"
+            log_info "Use: claude-glm --dangerously-skip-permissions to enable per-session"
+            ;;
+    esac
+
+    # Write config file
+    (umask 077
+        cat > "$config_file" << EOF
+# Claude Code Model Switcher Configuration
+AUTO_DANGEROUS_MODE=$auto_danger
+EOF
+    )
+    chmod 600 "$config_file" 2>/dev/null || true
+}
+
 ensure_path_hint() {
     if [[ ":$PATH:" == *":$LOCAL_BIN_DIR:"* ]]; then
         return 0
@@ -319,6 +353,7 @@ main() {
     remove_old_aliases
     install_wrapper_scripts
     configure_api_keys
+    configure_dangerous_mode
     ensure_path_hint
     show_post_install
 }

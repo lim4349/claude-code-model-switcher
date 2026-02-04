@@ -72,8 +72,16 @@ if [[ -z "${claude_bin:-}" || ! -x "$claude_bin" ]]; then
     exit 1
 fi
 
+# Read config for auto dangerous mode
+CONFIG_FILE="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.model-switcher-config"
+AUTO_DANGEROUS_MODE="false"
+if [[ -f "$CONFIG_FILE" ]]; then
+    # shellcheck disable=SC1090
+    source "$CONFIG_FILE" 2>/dev/null || true
+fi
+
 extra_args=()
-if [[ "$have_danger" == false ]]; then
+if [[ "$have_danger" == false && "$AUTO_DANGEROUS_MODE" == "true" ]]; then
     extra_args+=(--dangerously-skip-permissions)
 fi
 

@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-# Compatibility wrapper (typo alias): cluade-glm -> claude-glm
-
-set -euo pipefail
-exec "$(dirname "$0")/claude-glm" "$@"
