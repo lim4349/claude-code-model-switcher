@@ -31,7 +31,14 @@ _find_real_claude() {
         fi
     fi
 
-    # Prefer npm global prefix if available (common install path for claude-code)
+    # PRIORITIZE standalone installer (always latest version)
+    local standalone="$HOME/.local/bin/claude"
+    if [[ -x "$standalone" && "$(_realpath "$standalone")" != "$self_path" ]]; then
+        echo "$standalone"
+        return 0
+    fi
+
+    # Then check npm global installation
     if command -v npm >/dev/null 2>&1; then
         local npm_prefix
         npm_prefix="$(npm prefix -g 2>/dev/null || true)"
@@ -41,10 +48,12 @@ _find_real_claude() {
         fi
     fi
 
+    # Finally search PATH
     local IFS=':'
     local dir
     for dir in $PATH; do
         [[ -n "$dir" ]] || continue
+        [[ "$dir" == "$HOME/.local/bin" ]] && continue  # already checked above
         local candidate="$dir/claude"
         if [[ -x "$candidate" ]]; then
             if [[ "$(_realpath "$candidate")" != "$self_path" ]]; then

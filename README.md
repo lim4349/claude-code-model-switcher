@@ -45,8 +45,10 @@ GLM, Kimi 중 원하는 모델의 API 키를 입력하세요.
 | 명령어 | 모델 | 제공업체 |
 |--------|------|----------|
 | `claude` | Claude Sonnet 4.5 | Anthropic |
-| `claude-glm` | GLM 4.7 | Z.AI |
+| `claude-glm` | GLM 4.7 / 5 | Z.AI |
 | `claude-kimi` | Kimi 2.5 | Moonshot AI |
+
+**참고**: GLM 사용 시 Claude Code 낸부에서 `/model glm-4.7` 또는 `/model glm-5` 명령으로 모델을 전환할 수 있습니다.
 
 ```bash
 claude          # Claude
@@ -85,8 +87,8 @@ cd claude-code-model-switcher
 API 키 설정 파일은 삭제되지 않습니다. 수동으로 삭제하려면:
 
 ```bash
-rm ~/.claude/zai_settings.json
-rm ~/.claude/kimi_settings.json
+rm ~/.claude/zai_settings.json    # GLM 설정
+rm ~/.claude/kimi_settings.json   # Kimi 설정
 ```
 
 ---

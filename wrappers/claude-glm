@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Claude Code Model Switcher wrapper
 #
-# Runs Claude Code against Z.ai (GLM 4.7) via an Anthropic-compatible endpoint.
+# Runs Claude Code against Z.ai (GLM 4.7 & 5) via an Anthropic-compatible endpoint.
 # Uses `~/.claude/zai_settings.json` by default and enables
 # `--dangerously-skip-permissions` unless explicitly provided.
 
@@ -32,6 +32,14 @@ _find_real_claude() {
         fi
     fi
 
+    # PRIORITIZE standalone installer (always latest version)
+    local standalone="$HOME/.local/bin/claude"
+    if [[ -x "$standalone" && "$(_realpath "$standalone")" != "$self_path" ]]; then
+        echo "$standalone"
+        return 0
+    fi
+
+    # Then check npm global installation
     if command -v npm >/dev/null 2>&1; then
         local npm_prefix
         npm_prefix="$(npm prefix -g 2>/dev/null || true)"
@@ -41,10 +49,12 @@ _find_real_claude() {
         fi
     fi
 
+    # Finally search PATH
     local IFS=':'
     local dir
     for dir in $PATH; do
         [[ -n "$dir" ]] || continue
+        [[ "$dir" == "$HOME/.local/bin" ]] && continue  # already checked above
         local candidate="$dir/claude"
         if [[ -x "$candidate" ]]; then
             if [[ "$(_realpath "$candidate")" != "$self_path" ]]; then
@@ -88,16 +98,9 @@ if [[ -z "${claude_bin:-}" || ! -x "$claude_bin" ]]; then
     exit 1
 fi
 
-# Read config for auto dangerous mode
-CONFIG_FILE="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.model-switcher-config"
-AUTO_DANGEROUS_MODE="false"
-if [[ -f "$CONFIG_FILE" ]]; then
-    # shellcheck disable=SC1090
-    source "$CONFIG_FILE" 2>/dev/null || true
-fi
-
 extra_args=()
-if [[ "$have_danger" == false && "$AUTO_DANGEROUS_MODE" == "true" ]]; then
+# claude-glm: 기본으로 Governor(권한 확인) 모드가 아닌 비제한 실행을 위해 항상 추가
+if [[ "$have_danger" == false ]]; then
     extra_args+=(--dangerously-skip-permissions)
 fi
 if [[ "$have_settings" == false ]]; then

@@ -140,6 +140,12 @@ _write_provider_settings() {
         auth_key_name="ANTHROPIC_API_KEY"
     fi
 
+    # For GLM, provide both glm-4.7 and glm-5 as available models
+    local available_models="$model"
+    if [[ "$provider" == "glm" ]]; then
+        available_models="glm-4.7,glm-5"
+    fi
+
     (umask 077
         cat > "$settings_file" << EOF
 {
@@ -150,10 +156,11 @@ _write_provider_settings() {
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
     "ANTHROPIC_MODEL": "$model",
     "ANTHROPIC_SMALL_FAST_MODEL": "$model",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "$model",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "$model",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "$model",
-    "CLAUDE_CODE_SUBAGENT_MODEL": "$model"
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-4.7",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-4.7",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "glm-4.7",
+    "CLAUDE_CODE_AVAILABLE_MODELS": "$available_models"
   }
 }
 EOF
@@ -424,7 +431,8 @@ cmd_config() {
             echo -e "${color_bold}${color_blue}  Configure Provider Settings${color_reset}"
             echo -e "${color_bold}${color_blue}═══════════════════════════════════════════════════${color_reset}"
             echo ""
-            echo -e "  ${color_green}1${color_reset}. glm   (GLM 4.7 / Z.ai)"
+            echo -e "  ${color_green}1${color_reset}. glm   (GLM 4.7 & 5 / Z.ai)"
+            echo -e "       - Use /model to switch between glm-4.7 and glm-5"
             echo -e "  ${color_green}2${color_reset}. kimi  (Kimi 2.5 / Moonshot)"
             echo -e "  ${color_green}3${color_reset}. exit"
             echo ""
@@ -549,7 +557,8 @@ cmd_setup() {
 
         echo -e "${color_bold}Configure API keys (repeatable)${color_reset}"
         echo ""
-        echo -e "  ${color_green}1${color_reset}. GLM 4.7  (configured: ${glm_ok})"
+        echo -e "  ${color_green}1${color_reset}. GLM 4.7 & 5 (configured: ${glm_ok})"
+        echo -e "       - Use /model to switch between glm-4.7 and glm-5"
         echo -e "  ${color_green}2${color_reset}. Kimi 2.5 (configured: ${kimi_ok})"
         echo -e "  ${color_green}3${color_reset}. Done"
         echo ""
@@ -620,8 +629,12 @@ EOF
 
  ${color_bold}SUPPORTED MODELS${color_reset}
      ${color_green}Claude${color_reset}         Anthropic official (Sonnet, Opus, Haiku)
-     ${color_green}GLM${color_reset}            Z.AI (glm-4.7)
+     ${color_green}GLM${color_reset}            Z.AI (glm-4.7, glm-5)
      ${color_green}Kimi${color_reset}           Moonshot AI (kimi-k2.5)
+
+ ${color_bold}NOTES${color_reset}
+     GLM supports both glm-4.7 and glm-5 models.
+     Use '/model glm-4.7' or '/model glm-5' in Claude Code to switch.
 
 EOF
 }

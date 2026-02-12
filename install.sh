@@ -204,6 +204,16 @@ write_provider_settings() {
     local auth_key_name="${5:-ANTHROPIC_AUTH_TOKEN}"
     local settings_file="$CLAUDE_CONFIG_DIR/${name}_settings.json"
 
+    # For GLM, set up both glm-4.7 and glm-5 with appropriate defaults
+    local sonnet_model="$model"
+    local opus_model="$model"
+    local available_models="$model"
+    if [[ "$name" == "zai" ]]; then
+        sonnet_model="glm-4.7"
+        opus_model="glm-5"
+        available_models="glm-4.7,glm-5"
+    fi
+
     (umask 077
         cat > "$settings_file" << EOF
 {
@@ -213,11 +223,12 @@ write_provider_settings() {
     "API_TIMEOUT_MS": "3000000",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
     "ANTHROPIC_MODEL": "$model",
-    "ANTHROPIC_SMALL_FAST_MODEL": "$model",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "$model",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "$model",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "$model",
-    "CLAUDE_CODE_SUBAGENT_MODEL": "$model"
+    "ANTHROPIC_SMALL_FAST_MODEL": "$sonnet_model",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "$sonnet_model",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "$opus_model",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "$sonnet_model",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "$sonnet_model",
+    "CLAUDE_CODE_AVAILABLE_MODELS": "$available_models"
   }
 }
 EOF
@@ -232,7 +243,7 @@ configure_api_keys() {
     echo -e "${color_bold}${color_blue}Configure API Keys (optional)${color_reset}"
     echo -e "${color_yellow}Choose only the providers you want to use now.${color_reset}"
     echo ""
-    echo "  1) GLM 4.7 (Z.ai)"
+    echo "  1) GLM 4.7 & 5 (Z.ai) - Use /model to switch"
     echo "  2) Kimi 2.5 (Moonshot)"
     echo ""
     read -p "Enter choices (e.g. 1 2), or press Enter to skip: " -r choices
@@ -250,7 +261,7 @@ configure_api_keys() {
                 read -r -s -p "GLM API key: " glm_key
                 echo ""
                 if [[ -n "${glm_key:-}" ]]; then
-                    write_provider_settings "zai" "https://api.z.ai/api/anthropic" "glm-4.7" "$glm_key" "ANTHROPIC_AUTH_TOKEN"
+                    write_provider_settings "zai" "https://api.z.ai/api/anthropic" "glm-5" "$glm_key" "ANTHROPIC_AUTH_TOKEN"
                 else
                     log_warn "Skipped GLM (empty key)"
                 fi
@@ -332,7 +343,7 @@ show_post_install() {
     echo ""
     echo -e "${color_bold}Available Commands:${color_reset}"
     echo -e "  ${color_blue}claude${color_reset}           # Claude (default) + --dangerously-skip-permissions"
-    echo -e "  ${color_blue}claude-glm${color_reset}       # GLM 4.7"
+    echo -e "  ${color_blue}claude-glm${color_reset}       # GLM 4.7 & 5 (use /model to switch)"
     echo -e "  ${color_blue}claude-kimi${color_reset}      # Kimi 2.5"
     echo ""
 }
