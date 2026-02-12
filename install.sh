@@ -238,18 +238,41 @@ EOF
     log_success "Wrote settings: $settings_file"
 }
 
+_read_existing_token() {
+    local settings_file="$1"
+    [[ -f "$settings_file" ]] || return 0
+
+    if command -v jq >/dev/null 2>&1; then
+        jq -r '.env.ANTHROPIC_API_KEY // .env.ANTHROPIC_AUTH_TOKEN // empty' "$settings_file" 2>/dev/null || true
+    else
+        grep -o '"ANTHROPIC_API_KEY"[[:space:]]*:[[:space:]]*"[^"]*"' "$settings_file" 2>/dev/null | head -1 | sed 's/.*"ANTHROPIC_API_KEY"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || true
+    fi
+}
+
 configure_api_keys() {
+    local zai_file="$CLAUDE_CONFIG_DIR/zai_settings.json"
+    local kimi_file="$CLAUDE_CONFIG_DIR/kimi_settings.json"
+    local existing_zai existing_kimi
+    existing_zai="$(_read_existing_token "$zai_file" || true)"
+    existing_kimi="$(_read_existing_token "$kimi_file" || true)"
+
     echo ""
-    echo -e "${color_bold}${color_blue}Configure API Keys (optional)${color_reset}"
-    echo -e "${color_yellow}Choose only the providers you want to use now.${color_reset}"
+    echo -e "${color_bold}${color_blue}Configure API Keys${color_reset}"
     echo ""
-    echo "  1) GLM 4.7 & 5 (Z.ai) - Use /model to switch"
-    echo "  2) Kimi 2.5 (Moonshot)"
+
+    local zai_status="not configured"
+    local kimi_status="not configured"
+    [[ -n "${existing_zai:-}" ]] && zai_status="${existing_zai:0:12}... (configured)"
+    [[ -n "${existing_kimi:-}" ]] && kimi_status="${existing_kimi:0:12}... (configured)"
+
+    echo "  1) GLM 4.7 & 5 (Z.ai) - $zai_status"
+    echo "  2) Kimi 2.5 (Moonshot) - $kimi_status"
     echo ""
-    read -p "Enter choices (e.g. 1 2), or press Enter to skip: " -r choices
+    echo -e "${color_yellow}Enter choices to update (e.g. 1 2), or press Enter to keep existing:${color_reset}"
+    read -r -p "> " choices
 
     if [[ -z "${choices// }" ]]; then
-        log_info "Skipping API key configuration"
+        log_info "Keeping existing API key configuration"
         return 0
     fi
 
@@ -258,20 +281,32 @@ configure_api_keys() {
         case "$choice" in
             1)
                 echo ""
+                if [[ -n "${existing_zai:-}" ]]; then
+                    echo "Current GLM key: ${existing_zai:0:12}..."
+                    echo "Press Enter to keep, or type new key:"
+                fi
                 read -r -s -p "GLM API key: " glm_key
                 echo ""
                 if [[ -n "${glm_key:-}" ]]; then
                     write_provider_settings "zai" "https://api.z.ai/api/anthropic" "glm-5" "$glm_key" "ANTHROPIC_AUTH_TOKEN"
+                elif [[ -n "${existing_zai:-}" ]]; then
+                    log_info "Kept existing GLM API key"
                 else
                     log_warn "Skipped GLM (empty key)"
                 fi
                 ;;
             2)
                 echo ""
+                if [[ -n "${existing_kimi:-}" ]]; then
+                    echo "Current Kimi key: ${existing_kimi:0:12}..."
+                    echo "Press Enter to keep, or type new key:"
+                fi
                 read -r -s -p "Kimi API key: " kimi_key
                 echo ""
                 if [[ -n "${kimi_key:-}" ]]; then
                     write_provider_settings "kimi" "https://api.kimi.com/coding/" "kimi-k2.5" "$kimi_key" "ANTHROPIC_API_KEY"
+                elif [[ -n "${existing_kimi:-}" ]]; then
+                    log_info "Kept existing Kimi API key"
                 else
                     log_warn "Skipped Kimi (empty key)"
                 fi
