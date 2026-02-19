@@ -237,7 +237,7 @@ get_model_for_alias() {
     local alias="${1:-}"
     case "$alias" in
         claude)        echo "claude-sonnet-4-5-20250515" ;;
-        claude-opus)   echo "claude-opus-4-5-20251101" ;;
+        claude-opus)   echo "claude-opus-4-6" ;;
         claude-sonnet) echo "claude-sonnet-4-5-20250515" ;;
         claude-haiku)  echo "claude-haiku-4-5-20250114" ;;
         claude-glm)    echo "glm-4.7" ;;

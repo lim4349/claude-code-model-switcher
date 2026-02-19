@@ -6,6 +6,10 @@
 
 set -euo pipefail
 
+# Version check cache (24 hours)
+VERSION_CACHE_FILE="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.claude-version-cache"
+VERSION_CACHE_TTL=86400
+
 _realpath() {
     if command -v realpath >/dev/null 2>&1; then
         realpath "$1"
@@ -16,35 +20,70 @@ _realpath() {
     fi
 }
 
+_check_version() {
+    local current latest
+    current=$("$claude_bin" --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "0.0.0")
+
+    # Check cache first
+    local now cache_time cached_latest
+    now=$(date +%s 2>/dev/null || echo "0")
+    if [[ -f "$VERSION_CACHE_FILE" ]]; then
+        cache_time=$(stat -c %Y "$VERSION_CACHE_FILE" 2>/dev/null || stat -f %m "$VERSION_CACHE_FILE" 2>/dev/null || echo "0")
+        cached_latest=$(cat "$VERSION_CACHE_FILE" 2>/dev/null || echo "")
+        if [[ -n "$cached_latest" && $((now - cache_time)) -lt $VERSION_CACHE_TTL ]]; then
+            latest="$cached_latest"
+        fi
+    fi
+
+    # Fetch latest version if cache expired or empty
+    if [[ -z "${latest:-}" ]]; then
+        latest=$(curl -fsSL https://storage.googleapis.com/claude-code-dist-86c565f3-f756-42ad-8dfa-d59b1c096819/claude-code-releases/latest 2>/dev/null || echo "")
+        if [[ -n "$latest" ]]; then
+            echo "$latest" > "$VERSION_CACHE_FILE" 2>/dev/null || true
+        fi
+    fi
+
+    # Compare versions
+    if [[ -n "${latest:-}" && "$current" != "$latest" ]]; then
+        echo "⚠ Claude Code outdated: $current → $latest" >&2
+        echo "  Run: curl -fsSL https://claude.ai/install.sh | bash" >&2
+    fi
+}
+
 _find_real_claude() {
     local self_path
     self_path="$(_realpath "$0")"
 
-    # If we overwrote ~/.local/bin/claude, installer backs it up to claude.original.
-    # Prefer it when present so we don't depend on npm prefix.
-    local sibling_original
-    sibling_original="$(dirname "$self_path")/claude.original"
-    if [[ -x "$sibling_original" ]]; then
-        if ! grep -q "Claude Code Model Switcher wrapper" "$sibling_original" 2>/dev/null; then
-            echo "$sibling_original"
+    # Check for sibling binary (claude.bin symlink from standalone installer)
+    local sibling_bin
+    sibling_bin="$(dirname "$self_path")/claude.bin"
+    if [[ -x "$sibling_bin" ]]; then
+        echo "$sibling_bin"
+        return 0
+    fi
+
+    # Check standalone installer versions directory (highest version)
+    local versions_dir="$HOME/.local/share/claude/versions"
+    if [[ -d "$versions_dir" ]]; then
+        local latest_version
+        latest_version=$(ls -1 "$versions_dir" 2>/dev/null | sort -V | tail -1)
+        if [[ -n "$latest_version" && -x "$versions_dir/$latest_version" ]]; then
+            echo "$versions_dir/$latest_version"
             return 0
         fi
     fi
 
-    # PRIORITIZE standalone installer (always latest version)
-    local standalone="$HOME/.local/bin/claude"
-    if [[ -x "$standalone" && "$(_realpath "$standalone")" != "$self_path" ]]; then
-        echo "$standalone"
-        return 0
-    fi
-
-    # Then check npm global installation
+    # Check npm global installation
     if command -v npm >/dev/null 2>&1; then
         local npm_prefix
         npm_prefix="$(npm prefix -g 2>/dev/null || true)"
         if [[ -n "${npm_prefix:-}" && -x "$npm_prefix/bin/claude" ]]; then
-            echo "$npm_prefix/bin/claude"
-            return 0
+            if [[ "$(_realpath "$npm_prefix/bin/claude")" != "$self_path" ]]; then
+                if ! grep -q "Claude Code Model Switcher wrapper" "$npm_prefix/bin/claude" 2>/dev/null; then
+                    echo "$npm_prefix/bin/claude"
+                    return 0
+                fi
+            fi
         fi
     fi
 
@@ -53,12 +92,14 @@ _find_real_claude() {
     local dir
     for dir in $PATH; do
         [[ -n "$dir" ]] || continue
-        [[ "$dir" == "$HOME/.local/bin" ]] && continue  # already checked above
+        [[ "$dir" == "$HOME/.local/bin" ]] && continue
         local candidate="$dir/claude"
         if [[ -x "$candidate" ]]; then
             if [[ "$(_realpath "$candidate")" != "$self_path" ]]; then
-                echo "$candidate"
-                return 0
+                if ! grep -q "Claude Code Model Switcher wrapper" "$candidate" 2>/dev/null; then
+                    echo "$candidate"
+                    return 0
+                fi
             fi
         fi
     done
@@ -80,6 +121,9 @@ if [[ -z "${claude_bin:-}" || ! -x "$claude_bin" ]]; then
     echo "✗ Claude Code not found. Install with: npm install -g @anthropic-ai/claude-code" >&2
     exit 1
 fi
+
+# Check for updates (async, non-blocking)
+_check_version &
 
 # Read config for auto dangerous mode
 CONFIG_FILE="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.model-switcher-config"

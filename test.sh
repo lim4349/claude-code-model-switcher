@@ -159,12 +159,12 @@ test_current_command() {
 test_set_command() {
     log_info "Testing: Set command..."
 
-    "$TEST_SCRIPT" set claude-opus-4-5-20251101 &>/dev/null
+    "$TEST_SCRIPT" set claude-opus-4-6 &>/dev/null
 
     local output
     output=$("$TEST_SCRIPT" current 2>&1)
 
-    assert_contains "$output" "claude-opus-4-5-20251101" "Model should be set"
+    assert_contains "$output" "claude-opus-4-6" "Model should be set"
 }
 
 test_settings_file_creation() {
