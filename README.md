@@ -14,19 +14,39 @@ npm install -g @anthropic-ai/claude-code
 
 ### 설치
 
+**Linux / macOS:**
+
 ```bash
-git clone https://github.com/your-username/claude-code-model-switcher.git
+git clone https://github.com/lim4349/claude-code-model-switcher.git
 cd claude-code-model-switcher
 ./install.sh
 ```
 
+**Windows (PowerShell):**
+
+```powershell
+git clone https://github.com/lim4349/claude-code-model-switcher.git
+cd claude-code-model-switcher
+powershell -ExecutionPolicy Bypass -File install.ps1
+```
+
 ### 설치 후
 
-새로운 터미널을 열거나 다음을 실행하세요:
+**Linux / macOS:**
 
 ```bash
 source ~/.bashrc   # 또는 source ~/.zshrc
 ```
+
+**Windows:**
+
+설치 완료 후 안내되는 명령어를 실행하세요:
+
+```powershell
+$env:Path = "C:\Users\사용자명\.local\bin;$env:Path"
+```
+
+새 PowerShell 창을 열면 자동으로 적용됩니다.
 
 ---
 
@@ -79,9 +99,19 @@ claude-model list       # 사용 가능한 모델 목록
 
 ## 삭제
 
+**Linux / macOS:**
+
 ```bash
 cd claude-code-model-switcher
 ./uninstall.sh
+```
+
+**Windows:**
+
+```powershell
+Remove-Item -Recurse -Force "$env:USERPROFILE\.local\bin\claude*"
+Remove-Item "$env:USERPROFILE\.claude\claude*.sh"
+Remove-Item "$env:USERPROFILE\.claude\*_settings.json"
 ```
 
 API 키 설정 파일은 삭제되지 않습니다. 수동으로 삭제하려면:
