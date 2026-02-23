@@ -20,12 +20,6 @@ curl -fsSL https://claude.ai/install.sh | sh
 powershell -c "irm claude.ai/install.ps1 | iex"
 ```
 
-또는 npm으로 설치:
-
-```bash
-npm install -g @anthropic-ai/claude-code
-```
-
 ### 설치
 
 **Linux / macOS:**
