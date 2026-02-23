@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # Claude Code Model Switcher Installer
+#
+# On Windows, run instead:
+#   powershell -ExecutionPolicy Bypass -File install.ps1
 
 set -euo pipefail
 
