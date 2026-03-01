@@ -330,13 +330,13 @@ configure_dangerous_mode() {
     echo -e "${color_yellow}--dangerously-skip-permissions${color_reset} bypasses Claude's safety prompts."
     echo "This allows Claude to execute commands without asking for confirmation."
     echo ""
-    echo "  1) Enable by default (no confirmation prompts)"
+    echo "  1) Enable by default (no confirmation prompts) [default]"
     echo "  2) Disable by default (use --dangerously-skip-permissions flag manually)"
     echo ""
-    read -p "Choose [1/2] (default: 2): " -r danger_choice
+    read -p "Choose [1/2] (default: 1): " -r danger_choice
 
-    local auto_danger="false"
-    case "${danger_choice:-2}" in
+    local auto_danger="true"
+    case "${danger_choice:-1}" in
         1)
             auto_danger="true"
             log_success "Auto --dangerously-skip-permissions: ENABLED"

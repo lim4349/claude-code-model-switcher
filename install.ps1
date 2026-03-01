@@ -221,11 +221,11 @@ function Configure-DangerousMode {
     Write-Host "Safety Mode Configuration" -ForegroundColor Blue
     Write-Host ""
     Write-Host "--dangerously-skip-permissions bypasses Claude's safety prompts." -ForegroundColor Yellow
-    Write-Host "  1) Enable by default"
+    Write-Host "  1) Enable by default [default]"
     Write-Host "  2) Disable by default (use flag manually)"
     Write-Host ""
-    $choice = Read-Host "Choose [1/2] (default: 2)"
-    $autoDanger = if ($choice -eq "1") { "true" } else { "false" }
+    $choice = Read-Host "Choose [1/2] (default: 1)"
+    $autoDanger = if ($choice -eq "" -or $choice -eq "1") { "true" } else { "false" }
     if ($autoDanger -eq "true") { Log-Success "Auto --dangerously-skip-permissions: ENABLED" }
     else { Log-Info "Use: claude-glm --dangerously-skip-permissions to enable per-session" }
     $configFile = Join-Path $ClaudeConfigDir ".model-switcher-config"
