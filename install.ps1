@@ -138,8 +138,8 @@ exit 1
 function Write-ProviderSettings {
     param([string]$Name, [string]$BaseUrl, [string]$Model, [string]$Token, [string]$AuthKey = "ANTHROPIC_AUTH_TOKEN")
     $settingsFile = Join-Path $ClaudeConfigDir "${Name}_settings.json"
-    $sonnet = $Model; $opus = $Model; $available = $Model
-    if ($Name -eq "zai") { $sonnet = "glm-4.7"; $opus = "glm-5"; $available = "glm-4.7,glm-5" }
+    $sonnet = $Model; $opus = $Model; $haiku = $Model; $available = $Model
+    if ($Name -eq "zai") { $sonnet = "glm-5"; $opus = "glm-5.1"; $haiku = "glm-4.7"; $available = "glm-4.7,glm-5,glm-5.1" }
     $json = @{
         env = @{
             ANTHROPIC_BASE_URL = $BaseUrl
@@ -147,10 +147,10 @@ function Write-ProviderSettings {
             API_TIMEOUT_MS = "3000000"
             CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1"
             ANTHROPIC_MODEL = $Model
-            ANTHROPIC_SMALL_FAST_MODEL = $sonnet
+            ANTHROPIC_SMALL_FAST_MODEL = $haiku
             ANTHROPIC_DEFAULT_SONNET_MODEL = $sonnet
             ANTHROPIC_DEFAULT_OPUS_MODEL = $opus
-            ANTHROPIC_DEFAULT_HAIKU_MODEL = $sonnet
+            ANTHROPIC_DEFAULT_HAIKU_MODEL = $haiku
             CLAUDE_CODE_SUBAGENT_MODEL = $sonnet
             CLAUDE_CODE_AVAILABLE_MODELS = $available
         }
@@ -185,7 +185,7 @@ function Configure-ApiKeys {
     if ($existingZai) { $zaiStatus = $existingZai.Substring(0, [Math]::Min(12, $existingZai.Length)) + "... (configured)" }
     if ($existingKimi) { $kimiStatus = $existingKimi.Substring(0, [Math]::Min(12, $existingKimi.Length)) + "... (configured)" }
 
-    Write-Host "  1) GLM 4.7 & 5 (Z.ai) - $zaiStatus"
+    Write-Host "  1) GLM 5.1 (Z.ai) - $zaiStatus"
     Write-Host "  2) Kimi 2.5 (Moonshot) - $kimiStatus"
     Write-Host ""
     $choices = Read-Host "Enter choices to update (e.g. 1 2), or press Enter to keep existing"
@@ -200,7 +200,7 @@ function Configure-ApiKeys {
             "1" {
                 if ($existingZai) { Write-Host "Current GLM key: $($existingZai.Substring(0, [Math]::Min(12, $existingZai.Length)))... Press Enter to keep" }
                 $glmKey = Read-Host "GLM API key"
-                if ($glmKey) { Write-ProviderSettings "zai" "https://api.z.ai/api/anthropic" "glm-5" $glmKey "ANTHROPIC_AUTH_TOKEN" }
+                if ($glmKey) { Write-ProviderSettings "zai" "https://api.z.ai/api/anthropic" "glm-5.1" $glmKey "ANTHROPIC_AUTH_TOKEN" }
                 elseif ($existingZai) { Log-Info "Kept existing GLM key" }
                 else { Log-Warn "Skipped GLM (empty key)" }
             }
