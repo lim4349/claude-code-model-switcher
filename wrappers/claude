@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # Claude Code Model Switcher wrapper
 #
-# Keeps default Claude behavior but enables `--dangerously-skip-permissions`
-# by default (unless user explicitly passes it).
+# Runs Claude Code with GLM 5.1 (Z.ai) by default.
+# Uses `~/.claude/zai_settings.json` and enables
+# `--dangerously-skip-permissions` unless explicitly provided.
 
 set -euo pipefail
+
+SETTINGS_FILE="${CLAUDE_SETTINGS_FILE:-$HOME/.claude/zai_settings.json}"
 
 # Version check cache (24 hours)
 VERSION_CACHE_FILE="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.claude-version-cache"
@@ -108,13 +111,29 @@ _find_real_claude() {
 }
 
 have_danger=false
+have_settings=false
 for arg in "$@"; do
     case "$arg" in
         --dangerously-skip-permissions|--dangerously-skip-permissions=*)
             have_danger=true
             ;;
+        --settings)
+            have_settings=true
+            ;;
+        --settings=*)
+            have_settings=true
+            ;;
     esac
 done
+
+if [[ "$have_settings" == false ]]; then
+    if [[ ! -f "$SETTINGS_FILE" ]]; then
+        echo "✗ Settings file not found: $SETTINGS_FILE" >&2
+        echo "  Run: claude-model setup  (or: claude-model config glm)" >&2
+        echo "  See: README.md (Setup section)" >&2
+        exit 1
+    fi
+fi
 
 claude_bin="$(_find_real_claude || true)"
 if [[ -z "${claude_bin:-}" || ! -x "$claude_bin" ]]; then
@@ -136,6 +155,9 @@ fi
 extra_args=()
 if [[ "$have_danger" == false && "$AUTO_DANGEROUS_MODE" == "true" ]]; then
     extra_args+=(--dangerously-skip-permissions)
+fi
+if [[ "$have_settings" == false ]]; then
+    extra_args+=(--settings "$SETTINGS_FILE")
 fi
 
 exec "$claude_bin" "${extra_args[@]}" "$@"

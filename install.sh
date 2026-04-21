@@ -295,7 +295,8 @@ configure_api_keys() {
                 if [[ -n "${glm_key:-}" ]]; then
                     write_provider_settings "zai" "https://api.z.ai/api/anthropic" "glm-5.1" "$glm_key" "ANTHROPIC_AUTH_TOKEN"
                 elif [[ -n "${existing_zai:-}" ]]; then
-                    log_info "Kept existing GLM API key"
+                    write_provider_settings "zai" "https://api.z.ai/api/anthropic" "glm-5.1" "$existing_zai" "ANTHROPIC_AUTH_TOKEN"
+                    log_info "Updated GLM settings to glm-5.1 with existing key"
                 else
                     log_warn "Skipped GLM (empty key)"
                 fi
@@ -382,8 +383,8 @@ show_post_install() {
     echo "  If the commands aren't found, ensure $LOCAL_BIN_DIR is on your PATH."
     echo ""
     echo -e "${color_bold}Available Commands:${color_reset}"
-    echo -e "  ${color_blue}claude${color_reset}           # Claude (default) + --dangerously-skip-permissions"
-    echo -e "  ${color_blue}claude-glm${color_reset}       # GLM 5.1 (use /model to switch)"
+    echo -e "  ${color_blue}claude${color_reset}           # GLM 5.1 (default) + --dangerously-skip-permissions"
+    echo -e "  ${color_blue}claude-glm${color_reset}       # GLM 5.1 (alias, use /model to switch)"
     echo -e "  ${color_blue}claude-kimi${color_reset}      # Kimi 2.5"
     echo ""
 }
