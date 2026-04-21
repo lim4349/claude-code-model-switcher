@@ -1,28 +1,19 @@
 # Claude Code Model Switcher
 
-Claude Code CLI에서 다양한 AI 모델을 쉽게 전환해서 사용할 수 있는 도구입니다.
+Claude Code CLI를 Claude, GLM, Kimi 설정으로 쉽게 전환해 실행할 수 있게 해주는 래퍼 도구입니다.
 
----
+## 지원 모델 경로
+
+- `claude` -> Anthropic Claude Code 기본 경로
+- `claude-glm` -> Z.AI(GLM) 설정 적용
+- `claude-kimi` -> Moonshot(Kimi) 설정 적용
+- `claude-model` -> 설정/상태 관리 커맨드
+
+GLM 설정은 현재 `glm-4.7`, `glm-5`, `glm-5.1` 3단 구성을 지원합니다.
 
 ## 설치
 
-### 전제 조건
-
-**Linux / macOS:**
-
-```bash
-curl -fsSL https://claude.ai/install.sh | sh
-```
-
-**Windows:**
-
-```powershell
-powershell -c "irm claude.ai/install.ps1 | iex"
-```
-
-### 설치
-
-**Linux / macOS:**
+### Linux / macOS
 
 ```bash
 git clone https://github.com/lim4349/claude-code-model-switcher.git
@@ -30,7 +21,7 @@ cd claude-code-model-switcher
 ./install.sh
 ```
 
-**Windows (PowerShell):**
+### Windows PowerShell
 
 ```powershell
 git clone https://github.com/lim4349/claude-code-model-switcher.git
@@ -38,99 +29,48 @@ cd claude-code-model-switcher
 powershell -ExecutionPolicy Bypass -File install.ps1
 ```
 
-### 설치 후
+## 설치 결과
 
-**Linux / macOS:**
+설치 스크립트는 보통 다음 위치를 사용합니다.
 
-```bash
-source ~/.bashrc   # 또는 source ~/.zshrc
-```
+- `~/.local/bin/claude`
+- `~/.local/bin/claude-glm`
+- `~/.local/bin/claude-kimi`
+- `~/.local/bin/claude-model`
+- `~/.claude/*_settings.json`
 
-**Windows:**
-
-설치 완료 후 안내되는 명령어를 실행하세요:
-
-```powershell
-$env:Path = "C:\Users\사용자명\.local\bin;$env:Path"
-```
-
-새 PowerShell 창을 열면 자동으로 적용됩니다.
-
----
+기존 alias 기반 사용자를 위해 `~/.claude/claude*.sh` shim도 같이 설치합니다.
 
 ## 사용법
 
-### 1. API 키 설정
-
 ```bash
 claude-model setup
+claude-model config
+claude-model current
+claude-model list
+
+claude
+claude-glm
+claude-kimi
 ```
 
-GLM, Kimi 중 원하는 모델의 API 키를 입력하세요.
+## 파일 구조
 
-### 2. 모델 실행
-
-| 명령어 | 모델 | 제공업체 |
-|--------|------|----------|
-| `claude` | Claude Sonnet 4.5 | Anthropic |
-| `claude-glm` | GLM 4.7 / 5 | Z.AI |
-| `claude-kimi` | Kimi 2.5 | Moonshot AI |
-
-**참고**: GLM 사용 시 Claude Code 낸부에서 `/model glm-4.7` 또는 `/model glm-5` 명령으로 모델을 전환할 수 있습니다.
-
-```bash
-claude          # Claude
-claude-glm      # GLM
-claude-kimi     # Kimi
+```text
+claude-code-model-switcher/
+├── install.sh
+├── install.ps1
+├── uninstall.sh
+├── claude-code-model-switcher.sh
+├── test.sh
+└── wrappers/
+    ├── claude
+    ├── claude-glm
+    └── claude-kimi
 ```
 
-### 3. 관리 명령어
+## 주의사항
 
-```bash
-claude-model setup      # API 키 설정 (반복 가능)
-claude-model config     # 개별 모델 설정
-claude-model current    # 현재 모델 확인
-claude-model list       # 사용 가능한 모델 목록
-```
-
----
-
-## API 키 발급
-
-| 제공업체 | 링크 |
-|----------|------|
-| **Claude** | https://console.anthropic.com/ |
-| **GLM** | https://open.bigmodel.cn/ |
-| **Kimi** | https://platform.moonshot.ai/ |
-
----
-
-## 삭제
-
-**Linux / macOS:**
-
-```bash
-cd claude-code-model-switcher
-./uninstall.sh
-```
-
-**Windows:**
-
-```powershell
-Remove-Item -Recurse -Force "$env:USERPROFILE\.local\bin\claude*"
-Remove-Item "$env:USERPROFILE\.claude\claude*.sh"
-Remove-Item "$env:USERPROFILE\.claude\*_settings.json"
-```
-
-API 키 설정 파일은 삭제되지 않습니다. 수동으로 삭제하려면:
-
-```bash
-rm ~/.claude/zai_settings.json    # GLM 설정
-rm ~/.claude/kimi_settings.json   # Kimi 설정
-```
-
----
-
-## 라이선스
-
-MIT
+- Claude Code 원본 실행 파일이 먼저 설치되어 있어야 합니다
+- 설치 후 shell PATH에 `~/.local/bin`이 포함되어야 합니다
+- provider별 토큰은 `~/.claude/*_settings.json`에 저장됩니다

@@ -383,9 +383,9 @@ show_post_install() {
     echo "  If the commands aren't found, ensure $LOCAL_BIN_DIR is on your PATH."
     echo ""
     echo -e "${color_bold}Available Commands:${color_reset}"
-    echo -e "  ${color_blue}claude${color_reset}           # GLM 5.1 (default) + --dangerously-skip-permissions"
-    echo -e "  ${color_blue}claude-glm${color_reset}       # GLM 5.1 (alias, use /model to switch)"
-    echo -e "  ${color_blue}claude-kimi${color_reset}      # Kimi 2.5"
+    echo -e "  ${color_blue}claude${color_reset}           # Standard Claude Code (Anthropic)"
+    echo -e "  ${color_blue}claude-glm${color_reset}       # GLM 5.1 (Z.ai) + --dangerously-skip-permissions"
+    echo -e "  ${color_blue}claude-kimi${color_reset}      # Kimi 2.5 (Moonshot)"
     echo ""
 }
 
